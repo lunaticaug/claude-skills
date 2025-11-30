@@ -7,7 +7,7 @@ description: Interactive skill for brainstorming, goal-setting, and creating str
 
 ## Overview
 
-This skill provides a structured, interactive approach to brainstorming and creating comprehensive learning plans. It guides users through goal clarification, resource discovery, and actionable plan development using a conversational, Socratic method.
+This skill provides a structured, efficient approach to brainstorming and creating comprehensive learning plans. It guides users through goal clarification, resource discovery, and actionable plan development using case-based pattern recognition and closed questions for rapid, precise planning.
 
 ## When to Use This Skill
 
@@ -26,22 +26,70 @@ This skill follows a four-phase interactive cycle:
 
 ### Phase 1: Discovery & Goal Clarification
 
-To begin the planning process, conduct a discovery conversation with the user:
+To begin the planning process, use closed questions and case examples to efficiently gather information:
 
-**Initial Questions to Ask:**
-1. What specific goal or exam are you preparing for?
-2. What's your current knowledge level or experience with this subject?
-3. What's your target completion date or deadline?
-4. How much time can you dedicate per week?
-5. What learning style works best for you? (visual, reading, practice-based, etc.)
-6. Have you attempted this before? If so, what worked or didn't work?
-7. What specific challenges do you anticipate?
+**Structured Discovery Questions (Closed Format):**
 
-**Discovery Guidelines:**
-- Ask 2-3 questions at a time to avoid overwhelming the user
-- Use follow-up questions to drill deeper into vague responses
-- Help users articulate implicit constraints (work schedule, family commitments, budget)
-- Identify both intrinsic motivations (career growth, personal interest) and extrinsic pressures (deadlines, requirements)
+**Goal Identification:**
+1. What is the specific exam/certification/skill? **[Exact name]**
+2. Is this required for: job/promotion/personal interest? **[Pick one]**
+3. Target completion date: **[Specific date or month]**
+
+**Current State:**
+4. Background in this subject: none/basic/intermediate/advanced? **[Pick one]**
+5. Have you attempted this before? **[Yes/No]**
+   - If yes: What was the result? **[Passed some sections/Failed/Incomplete]**
+
+**Time & Resources:**
+6. Work status: full-time/part-time/student/unemployed? **[Pick one]**
+7. Weekly study hours available: <10 / 10-15 / 15-20 / 20+ ? **[Pick one]**
+8. Budget for materials: <$500 / $500-1500 / $1500-3000 / $3000+ ? **[Pick one]**
+
+**Learning Preferences:**
+9. Preferred format: video courses/textbooks/practice problems/mix? **[Pick 1-2]**
+10. Study schedule preference: daily consistent/weekend intensive/flexible? **[Pick one]**
+11. Accountability need: high (need structure)/medium/low (self-directed)? **[Pick one]**
+
+**Discovery Approach - Present Cases First:**
+
+After understanding the basic goal, present 3-4 relevant case studies:
+
+"I've seen several successful approaches for [their goal]. Let me share some cases:
+
+**Case 1: [Profile Type A]**
+- Background: [Similar to user's background]
+- Timeline: [X months/weeks]
+- Resources used: [Specific materials]
+- Study pattern: [Schedule description]
+- Result: [Outcome and score if applicable]
+
+**Case 2: [Profile Type B]**
+- Background: [Different approach]
+- Timeline: [Y months/weeks]
+- Resources used: [Different materials]
+- Study pattern: [Different schedule]
+- Result: [Outcome]
+
+**Case 3: [Profile Type C]**
+- [Similar structure]
+
+Looking at these cases:
+1. Which timeline feels most realistic for you? **[A/B/C]**
+2. Which resource approach fits your budget? **[A/B/C]**
+3. Which study pattern matches your schedule? **[A/B/C]**"
+
+**Pattern Recognition Questions:**
+
+After presenting cases, help users identify common success factors:
+- "All three cases spent 300-500 total hours. Does that match your expectation? **[Yes/No/Need adjustment]**"
+- "Two used intensive review courses, one used budget resources. Both worked. Which direction appeals to you? **[Intensive/Budget/Hybrid]**"
+- "The fastest completion was 4 months with 25 hrs/week. The longest was 12 months with 10 hrs/week. Where do you fall? **[Fast/Medium/Extended]**"
+
+**Constraint Identification (Closed Questions):**
+- Work schedule: "Do you work: standard hours (9-5)/shifts/flexible/weekends?" **[Pick one]**
+- Family: "Do you have: young children/school-age children/elderly care/no dependents?" **[Pick applicable]**
+- Location: "Can you study: at home/library/office/commute?" **[Pick all applicable]**
+- Deadlines: "Is your target date: firm deadline/flexible/no deadline?" **[Pick one]**
 
 ### Phase 2: Information Gathering & Research
 
@@ -211,25 +259,69 @@ After presenting the initial plan, work with the user to refine:
 Throughout the process, maintain an engaging, supportive dialogue:
 
 **Conversation Principles:**
-1. **Socratic questioning**: Help users discover insights rather than prescribing solutions
-2. **Active listening**: Reflect back what you hear to ensure understanding
-3. **Encouraging tone**: Acknowledge concerns while maintaining optimism
-4. **Concrete examples**: Use specific scenarios to illustrate abstract concepts
+1. **Case-based inductive learning**: Present multiple concrete examples, then help users discover patterns and common principles
+2. **Closed questions for efficiency**: Use specific, targeted questions to gather key information quickly
+3. **Active listening**: Reflect back what you hear to ensure understanding
+4. **Encouraging tone**: Acknowledge concerns while maintaining optimism
 5. **Collaborative language**: "Let's work together" vs. "You should do this"
 
-**Sample Dialogue Patterns:**
+**Case-Based Pattern Discovery Approach:**
 
-*When exploring goals:*
-"I notice you mentioned wanting to pass the CPA exam. Could you tell me more about what's driving this goal right now? Is it for a specific job opportunity, career advancement, or personal achievement?"
+Instead of asking abstract questions, present concrete cases and guide pattern recognition:
 
-*When discussing constraints:*
-"You mentioned you can study 15 hours per week. Help me understand what that looks like - are those hours spread evenly across the week, or concentrated on weekends? Are there weeks that might be more or less available?"
+*Example: Understanding study timeline needs*
+"Let me show you three successful CPA preparation cases:
+- Case A: Full-time accountant, studied 15 hrs/week for 8 months (480 total hours)
+- Case B: Recent graduate, studied 25 hrs/week for 5 months (500 total hours)
+- Case C: Career changer, studied 10 hrs/week for 12 months (480 total hours)
 
-*When presenting research:*
-"Based on what I've found, most successful CPA candidates spend 300-400 hours total across all four sections. Given your accounting background, you might be on the lower end of that range. Does that align with your expectations?"
+Looking at these patterns:
+1. Are you currently working full-time, part-time, or available for full-time study?
+2. What's your target completion timeline: under 6 months, 6-12 months, or 12+ months?
+3. Based on these cases, which pattern most closely matches your situation?"
 
-*When reviewing the plan:*
-"Looking at this schedule, I've got you studying FAR first since it's the foundation for other sections. Some people prefer starting with their strongest section for confidence. What feels right for you?"
+*Example: Resource selection through cases*
+"Here are three common resource strategies that work:
+- Intensive course approach: Becker or Wiley (comprehensive but expensive ~$3k)
+- Hybrid approach: Wiley CPA Excel + free YouTube lectures (~$1.5k)
+- Budget approach: Ninja CPA + free resources + library books (~$500)
+
+All three work - the difference is learning style and budget:
+1. Do you prefer structured video courses or self-paced reading?
+2. What's your budget range: under $500, $500-$1500, or $1500+?
+3. Do you need accountability features (live classes, deadlines) or are you self-motivated?"
+
+**Closed Question Patterns:**
+
+*For goal clarification:*
+- "What is your target exam date?" (not "When were you thinking of taking it?")
+- "How many hours per week can you commit?" (not "How much time do you have?")
+- "Have you taken this exam before: yes/no?" (not "What's your background with this?")
+
+*For constraint identification:*
+- "Do you have work/family commitments during: weekdays, weekends, or both?"
+- "Is your schedule: fixed weekly, variable, or project-based?"
+- "Can you study in: mornings, afternoons, evenings, or only weekends?"
+
+*For preference discovery:*
+- "Do you learn better through: videos, reading, or hands-on practice?"
+- "Do you prefer: one topic at a time (blocking) or mixing topics (interleaving)?"
+- "For difficult material, do you prefer: deep dives or multiple quick passes?"
+
+**Sample Dialogue with Closed Questions:**
+
+"I see you want to prepare for the CPA exam. Let me ask you some specific questions:
+
+1. Current status: Are you working full-time? **[Yes/No]**
+2. Accounting background: Do you have a degree in accounting? **[Yes/No]**
+3. Weekly availability: Can you commit 15+ hours per week? **[Yes/No]**
+4. Target timeline: Do you want to complete within 6 months? **[Yes/No]**
+5. Budget: Can you invest $1,000+ in materials? **[Yes/No]**
+
+Based on your answers, here are 2-3 proven approaches used by people in similar situations:
+[Present specific case examples matching their profile]
+
+Which of these resonates with your situation?"
 
 ## Tools and Resources Integration
 
