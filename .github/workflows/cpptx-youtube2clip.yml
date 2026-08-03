@@ -1,0 +1,273 @@
+name: Capture YouTube seminar frames through youtube2clip UI
+
+on:
+  push:
+    branches:
+      - tmp/cpptx-youtube2clip-20260804
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/cpptx-youtube2clip.yml
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser/media tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright pillow requests
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb
+          google-chrome --version
+      - name: Use the site's normal public clipping UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact/evidence artifact/downloads artifact/frames artifact/profile
+          cat > artifact/drive_ui.py <<'PY'
+          import json
+          import re
+          import time
+          from pathlib import Path
+          from urllib.parse import urlparse
+          from playwright.sync_api import sync_playwright
+
+          root=Path('artifact'); evidence=root/'evidence'; downloads=root/'downloads'
+          source='https://www.youtube.com/watch?v=7UXprjqSBvk'
+          events=[]; responses=[]; candidates=[]; download_records=[]; states=[]
+
+          def record_state(page,label):
+              try:
+                  inputs=page.locator('input,textarea,select').evaluate_all("""els=>els.map((e,i)=>({i,tag:e.tagName,type:e.type||'',name:e.name||'',id:e.id||'',placeholder:e.placeholder||'',value:e.value||'',min:e.min||'',max:e.max||'',step:e.step||'',aria:e.getAttribute('aria-label')||'',visible:!!(e.offsetWidth||e.offsetHeight||e.getClientRects().length)}))""")
+                  buttons=page.locator('button,[role=button],input[type=submit],a').evaluate_all("""els=>els.map((e,i)=>({i,tag:e.tagName,text:(e.innerText||e.value||e.getAttribute('aria-label')||'').trim().slice(0,240),href:e.href||'',visible:!!(e.offsetWidth||e.offsetHeight||e.getClientRects().length)})).filter(x=>x.visible)""")
+                  body=page.locator('body').inner_text(timeout=5000)[:10000]
+                  state={'label':label,'url':page.url,'title':page.title(),'inputs':inputs,'buttons':buttons[:200],'body_text':body}
+                  states.append(state)
+                  (evidence/f'{len(states):02d}-{label}.json').write_text(json.dumps(state,ensure_ascii=False,indent=2),encoding='utf-8')
+                  page.screenshot(path=str(evidence/f'{len(states):02d}-{label}.png'),full_page=False)
+                  (evidence/f'{len(states):02d}-{label}.html').write_text(page.content(),encoding='utf-8')
+              except Exception as exc:
+                  states.append({'label':label,'error':repr(exc)})
+
+          def harvest(obj):
+              if isinstance(obj,dict):
+                  for key,value in obj.items():
+                      if isinstance(value,str) and value.startswith(('http://','https://')):
+                          low=(key+' '+value).lower()
+                          if any(token in low for token in ['download','video','media','stream','mp4','webm','m3u8','file','url']):
+                              candidates.append(value)
+                      else: harvest(value)
+              elif isinstance(obj,list):
+                  for value in obj: harvest(value)
+
+          with sync_playwright() as p:
+              context=p.chromium.launch_persistent_context(str(root/'profile'),executable_path='/usr/bin/google-chrome',headless=False,viewport={'width':1440,'height':1000},locale='en-US',timezone_id='Asia/Seoul',accept_downloads=True,ignore_default_args=['--enable-automation'],args=['--disable-blink-features=AutomationControlled','--disable-dev-shm-usage','--no-first-run','--no-default-browser-check','--window-size=1440,1000'])
+              context.add_init_script("Object.defineProperty(navigator,'webdriver',{get:()=>undefined});")
+              page=context.pages[0] if context.pages else context.new_page()
+              page.on('console',lambda m: events.append({'type':f'console:{m.type}','text':m.text[:2000]}))
+              page.on('requestfailed',lambda r: events.append({'type':'requestfailed','text':f'{r.url} :: {r.failure}'[:2000]}))
+              def on_response(response):
+                  try:
+                      ctype=(response.headers.get('content-type') or '').lower()
+                      dispo=response.headers.get('content-disposition') or ''
+                      if ctype.startswith(('video/','audio/')) or 'attachment' in dispo.lower() or any(x in response.url.lower() for x in ['.mp4','.webm','.m3u8','download','clip']):
+                          candidates.append(response.url)
+                      if 'json' in ctype:
+                          data=response.json(); harvest(data)
+                          responses.append({'url':response.url,'status':response.status,'content_type':ctype,'json':data})
+                  except Exception: pass
+              page.on('response',on_response)
+              def on_download(download):
+                  try:
+                      path=downloads/(download.suggested_filename or f'download-{len(download_records)+1}.bin')
+                      download.save_as(str(path))
+                      download_records.append({'filename':path.name,'bytes':path.stat().st_size,'url':'<download-url-redacted>'})
+                  except Exception as exc:
+                      download_records.append({'error':repr(exc)})
+              page.on('download',on_download)
+
+              page.goto('https://youtube2clip.com/',wait_until='domcontentloaded',timeout=90000)
+              page.wait_for_timeout(5000); record_state(page,'landing')
+              visible_inputs=page.locator("input:not([type=hidden]),textarea")
+              filled=False
+              for i in range(visible_inputs.count()):
+                  loc=visible_inputs.nth(i)
+                  try:
+                      if not loc.is_visible(timeout=500): continue
+                      typ=(loc.get_attribute('type') or '').lower(); ph=(loc.get_attribute('placeholder') or '')+(loc.get_attribute('aria-label') or '')
+                      if typ in {'text','url','search',''} or re.search(r'youtube|url|link|search|paste',ph,re.I):
+                          loc.fill(source); filled=True
+                          try: loc.press('Enter')
+                          except Exception: pass
+                          break
+                  except Exception: pass
+              if not filled: raise RuntimeError('No visible URL/search input found')
+              page.wait_for_timeout(10000)
+              # Click an explicit search/continue action if Enter did not advance.
+              for regex in [r'^search$',r'continue',r'next',r'go',r'find']:
+                  try:
+                      loc=page.get_by_role('button',name=re.compile(regex,re.I)).first
+                      if loc.is_visible(timeout=700): loc.click(timeout=5000); page.wait_for_timeout(10000); break
+                  except Exception: pass
+              record_state(page,'after-search')
+
+              # Select the matching result/card when the search stage returns choices.
+              clicked=False
+              for selector in ["text=7UXprjqSBvk","text=지속가능성 공시 의무화 시대","text=삼일PwC"]:
+                  try:
+                      loc=page.locator(selector).first
+                      if loc.is_visible(timeout=1000): loc.click(timeout=5000); clicked=True; break
+                  except Exception: pass
+              if not clicked:
+                  # Prefer a visible result-like image/link, but avoid nav/terms links.
+                  links=page.locator('main a, main button, [class*=result] a, [class*=card] a, [class*=video] a')
+                  for i in range(min(links.count(),80)):
+                      loc=links.nth(i)
+                      try:
+                          if not loc.is_visible(timeout=300): continue
+                          text=((loc.inner_text(timeout=500) or '')+' '+(loc.get_attribute('href') or '')).lower()
+                          if any(bad in text for bad in ['privacy','terms','login','sign','home']): continue
+                          loc.click(timeout=5000); clicked=True; break
+                      except Exception: continue
+              if clicked: page.wait_for_timeout(10000)
+              record_state(page,'selected')
+
+              # Fill start/end controls, supporting seconds or HH:MM:SS representations.
+              controls=page.locator('input,textarea')
+              ranges=[]
+              for i in range(controls.count()):
+                  loc=controls.nth(i)
+                  try:
+                      if not loc.is_visible(timeout=300): continue
+                      attrs=' '.join([(loc.get_attribute(k) or '') for k in ['name','id','placeholder','aria-label']]).lower()
+                      typ=(loc.get_attribute('type') or '').lower()
+                      if typ=='range': ranges.append(loc); continue
+                      if any(x in attrs for x in ['start','from','begin']):
+                          for value in ['00:23:00','23:00','1380']:
+                              try: loc.fill(value); break
+                              except Exception: pass
+                      elif any(x in attrs for x in ['end','to','finish']):
+                          for value in ['00:25:00','25:00','1500']:
+                              try: loc.fill(value); break
+                              except Exception: pass
+                  except Exception: pass
+              if ranges:
+                  try:
+                      ranges[0].evaluate("(e)=>{e.value=Math.max(Number(e.min||0),Math.min(1380,Number(e.max||1380)));e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));}")
+                  except Exception: pass
+              if len(ranges)>1:
+                  try:
+                      ranges[-1].evaluate("(e)=>{e.value=Math.max(Number(e.min||0),Math.min(1500,Number(e.max||1500)));e.dispatchEvent(new Event('input',{bubbles:true}));e.dispatchEvent(new Event('change',{bubbles:true}));}")
+                  except Exception: pass
+              record_state(page,'times-set')
+
+              # Use normal visible buttons to request an MP4 clip/download.
+              action_patterns=[r'mp4',r'create.*clip',r'clip',r'cut',r'process',r'convert',r'download',r'export']
+              for pattern in action_patterns:
+                  clicked_any=False
+                  for role in ['button','link']:
+                      try:
+                          loc=page.get_by_role(role,name=re.compile(pattern,re.I)).first
+                          if loc.is_visible(timeout=700):
+                              loc.click(timeout=8000); clicked_any=True; page.wait_for_timeout(7000); break
+                      except Exception: pass
+                  if clicked_any: record_state(page,'action-'+re.sub(r'[^a-z]+','-',pattern));
+                  if download_records or candidates: pass
+              deadline=time.time()+150
+              while time.time()<deadline and not download_records:
+                  page.wait_for_timeout(3000)
+                  # Click newly appearing download buttons.
+                  try:
+                      loc=page.get_by_role('button',name=re.compile(r'download|save|mp4',re.I)).first
+                      if loc.is_visible(timeout=500): loc.click(timeout=3000)
+                  except Exception: pass
+              record_state(page,'final')
+              context.close()
+
+          # Store candidate URLs only in a transient file for the next step.
+          unique=[]
+          for url in candidates:
+              if isinstance(url,str) and url.startswith(('http://','https://')) and url not in unique: unique.append(url)
+          (root/'.media-candidates').write_text('\n'.join(unique),encoding='utf-8')
+          # Redact URL-like fields in response evidence.
+          def redact(obj):
+              if isinstance(obj,dict):
+                  return {k:('<redacted-url>' if isinstance(v,str) and v.startswith(('http://','https://')) else redact(v)) for k,v in obj.items()}
+              if isinstance(obj,list): return [redact(v) for v in obj]
+              return obj
+          (root/'ui-result.json').write_text(json.dumps({'states':states,'downloads':download_records,'candidate_count':len(unique),'responses':redact(responses)},ensure_ascii=False,indent=2),encoding='utf-8')
+          (root/'browser-events.json').write_text(json.dumps(events[-1000:],ensure_ascii=False,indent=2),encoding='utf-8')
+          PY
+          xvfb-run -a -s '-screen 0 1440x1000x24' python artifact/drive_ui.py > artifact/ui.log 2>&1 || true
+          rm -rf artifact/profile
+
+          cat > artifact/extract.py <<'PY'
+          import hashlib,json,math,subprocess,time
+          from pathlib import Path
+          from urllib.parse import urlparse
+          from PIL import Image,ImageDraw,ImageStat
+          root=Path('artifact'); frames=root/'frames'; downloads=root/'downloads'
+          source_start,source_end=1380,1740
+          attempts=[]; winner=None
+          local_videos=[p for p in downloads.iterdir() if p.is_file() and p.stat().st_size>100000]
+          urls=[x.strip() for x in (root/'.media-candidates').read_text(encoding='utf-8').splitlines() if x.strip()] if (root/'.media-candidates').exists() else []
+          candidates=[('file',str(p),p.name) for p in local_videos]+[('url',u,urlparse(u).netloc) for u in urls]
+          for i,(kind,value,label) in enumerate(candidates,1):
+              run=root/f'run-{i:03d}';run.mkdir(exist_ok=True)
+              # Downloaded clips are expected to begin at the requested source start; remote full streams need source seeking.
+              patterns=[['-i',value,'-t','360']] if kind=='file' else [['-ss',str(source_start),'-i',value,'-t',str(source_end-source_start)],['-i',value,'-ss',str(source_start),'-t',str(source_end-source_start)]]
+              for mode,middle in enumerate(patterns,1):
+                  for p in run.glob('frame-*.jpg'):p.unlink()
+                  cmd=['ffmpeg','-hide_banner','-y','-loglevel','warning','-rw_timeout','180000000',*middle,'-an','-vf',"fps=1/15,scale='min(960,iw)':-2",'-q:v','3',str(run/'frame-%03d.jpg')]
+                  started=time.time()
+                  try:
+                      done=subprocess.run(cmd,text=True,capture_output=True,timeout=900); imgs=sorted(run.glob('frame-*.jpg'));attempts.append({'kind':kind,'label':label,'mode':mode,'returncode':done.returncode,'duration_seconds':round(time.time()-started,3),'frame_count':len(imgs),'stderr_tail':done.stderr[-10000:].replace(value,'<redacted>')})
+                      if done.returncode==0 and len(imgs)>=4:winner=(run,kind,label);break
+                  except Exception as exc:attempts.append({'kind':kind,'label':label,'mode':mode,'error':repr(exc)})
+              if winner:break
+          selected=[]
+          if winner:
+              raw=sorted(winner[0].glob('frame-*.jpg')); keep=list(range(len(raw))) if len(raw)<=25 else sorted({round(i*(len(raw)-1)/24) for i in range(25)})
+              for oi,si in enumerate(keep,1):
+                  im=Image.open(raw[si]).convert('RGB');target=frames/f'frame-{oi:03d}.jpg';im.save(target,'JPEG',quality=90,optimize=True);sec=source_start+si*15;st=ImageStat.Stat(im);selected.append({'file':target.name,'source_second':sec,'source_timestamp':f'{sec//3600:02d}:{(sec%3600)//60:02d}:{sec%60:02d}','bytes':target.stat().st_size,'sha256':hashlib.sha256(target.read_bytes()).hexdigest(),'width':im.width,'height':im.height,'mean_rgb':[round(v,2) for v in st.mean],'stddev_rgb':[round(v,2) for v in st.stddev]})
+          hashes={x['sha256'] for x in selected};result={'status':'actual_video_frames_captured' if len(selected)>=4 and len(hashes)>=2 else 'failed','video_id':'7UXprjqSBvk','source_start_seconds':source_start,'source_end_seconds':source_end,'winner':{'kind':winner[1],'label':winner[2]} if winner else None,'selected_frame_count':len(selected),'unique_selected_hashes':len(hashes),'frames':selected,'attempts':attempts}
+          (root/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+          if selected:
+              sheet=Image.new('RGB',(1280,360*math.ceil(len(selected)/2)),'white');draw=ImageDraw.Draw(sheet)
+              for i,item in enumerate(selected):
+                  im=Image.open(frames/item['file']).convert('RGB');im.thumbnail((640,360));canvas=Image.new('RGB',(640,360),'black');canvas.paste(im,((640-im.width)//2,(360-im.height)//2));x=(i%2)*640;y=(i//2)*360;sheet.paste(canvas,(x,y));draw.text((x+10,y+10),item['source_timestamp'],fill='white',stroke_width=2,stroke_fill='black')
+              sheet.save(root/'contact-sheet.jpg','JPEG',quality=90,optimize=True)
+          for d in root.glob('run-*'):
+              if d.is_dir():
+                  for p in d.iterdir():p.unlink()
+                  d.rmdir()
+          PY
+          python artifact/extract.py
+          rm -f artifact/.media-candidates
+          cat artifact/result.json
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root=Path('artifact')
+          with zipfile.ZipFile(root/'cpptx-youtube2clip-output.zip','w',zipfile.ZIP_DEFLATED) as z:
+              for p in sorted(root.rglob('*')):
+                  if p.is_file() and p.name!='cpptx-youtube2clip-output.zip':z.write(p,p.relative_to(root))
+          PY
+      - name: Upload output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpptx-youtube2clip-output
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 2
