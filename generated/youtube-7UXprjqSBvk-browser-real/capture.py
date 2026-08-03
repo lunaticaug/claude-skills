@@ -1,0 +1,230 @@
+import base64
+import hashlib
+import io
+import json
+import time
+import zipfile
+from pathlib import Path
+from PIL import Image, ImageDraw, ImageStat
+from playwright.sync_api import sync_playwright
+
+root = Path('generated/youtube-7UXprjqSBvk-browser-real')
+frames_dir = root / 'frames'
+targets = [1380, 1390, 1400, 1415, 1430, 1450, 1470, 1500]
+records = []
+events = []
+
+with sync_playwright() as p:
+    context = p.chromium.launch_persistent_context(
+        str(root / 'profile'),
+        executable_path='/usr/bin/google-chrome',
+        headless=False,
+        viewport={'width': 1440, 'height': 900},
+        locale='ko-KR',
+        timezone_id='Asia/Seoul',
+        user_agent='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36',
+        ignore_default_args=['--enable-automation'],
+        args=[
+            '--autoplay-policy=no-user-gesture-required',
+            '--disable-blink-features=AutomationControlled',
+            '--disable-dev-shm-usage',
+            '--disable-features=MediaRouter,Translate',
+            '--no-first-run',
+            '--no-default-browser-check',
+            '--window-size=1440,900',
+        ],
+    )
+    context.add_init_script("""
+        Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+        Object.defineProperty(navigator, 'languages', {get: () => ['ko-KR','ko','en-US','en']});
+        Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3,4,5]});
+        window.chrome = window.chrome || {runtime:{}};
+    """)
+    context.add_cookies([
+        {'name':'SOCS','value':'CAI','domain':'.youtube.com','path':'/','secure':True,'sameSite':'Lax'},
+        {'name':'CONSENT','value':'YES+cb.20260804-00-p0.ko+FX+999','domain':'.youtube.com','path':'/','secure':True,'sameSite':'Lax'},
+    ])
+    page = context.pages[0] if context.pages else context.new_page()
+    page.on('console', lambda msg: events.append({'type':f'console:{msg.type}','text':msg.text[:2000]}))
+    page.on('pageerror', lambda exc: events.append({'type':'pageerror','text':str(exc)[:2000]}))
+    page.on('requestfailed', lambda req: events.append({'type':'requestfailed','text':f'{req.url} :: {req.failure}'[:2000]}))
+
+    url = 'https://www.youtube.com/watch?v=7UXprjqSBvk&t=1380s&autoplay=1'
+    response = page.goto(url, wait_until='domcontentloaded', timeout=90000)
+    page.wait_for_timeout(12000)
+
+    # Dismiss consent, survey, and sign-in overlays when they are optional.
+    for label in ['동의', '모두 수락', 'Accept all', '나중에', 'No thanks', '건너뛰기']:
+        try:
+            button = page.get_by_role('button', name=label).first
+            if button.is_visible(timeout=700):
+                button.click(timeout=2000)
+                page.wait_for_timeout(1200)
+        except Exception:
+            pass
+
+    # Attempt a genuine click gesture on the player and use the player API after page scripts initialize.
+    try:
+        player = page.locator('#movie_player').first
+        if player.is_visible(timeout=3000):
+            box = player.bounding_box()
+            if box:
+                page.mouse.click(box['x'] + box['width']/2, box['y'] + box['height']/2)
+                page.wait_for_timeout(1000)
+    except Exception:
+        pass
+
+    state_before = page.evaluate("""() => {
+        const v = document.querySelector('video');
+        const p = document.querySelector('#movie_player');
+        return {
+          href: location.href,
+          title: document.title,
+          bodyText: (document.body?.innerText || '').slice(0, 5000),
+          playerClass: p?.className || null,
+          video: v ? {
+            readyState: v.readyState,
+            networkState: v.networkState,
+            error: v.error ? {code:v.error.code,message:v.error.message} : null,
+            duration: v.duration,
+            currentTime: v.currentTime,
+            paused: v.paused,
+            videoWidth: v.videoWidth,
+            videoHeight: v.videoHeight,
+            currentSrc: v.currentSrc ? '<present>' : '<empty>'
+          } : null
+        };
+    }""")
+    (root / 'page-state-before.json').write_text(json.dumps(state_before, ensure_ascii=False, indent=2), encoding='utf-8')
+    page.screenshot(path=str(root / 'watch-page.png'), full_page=False)
+
+    for index, second in enumerate(targets, 1):
+        record = {'source_second': second}
+        try:
+            result = page.evaluate("""async (second) => {
+                const v = document.querySelector('video');
+                if (!v) return {ok:false, reason:'video-element-missing'};
+                v.muted = true;
+                try { await v.play(); } catch (e) {}
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                const seekPromise = new Promise(resolve => {
+                  let done = false;
+                  const finish = () => { if (!done) { done = true; resolve(); } };
+                  v.addEventListener('seeked', finish, {once:true});
+                  setTimeout(finish, 12000);
+                });
+                v.currentTime = second;
+                await seekPromise;
+                try { await v.play(); } catch (e) {}
+                await new Promise(resolve => setTimeout(resolve, 2200));
+                v.pause();
+                return {
+                  ok: v.readyState >= 2 && v.videoWidth > 0,
+                  readyState: v.readyState,
+                  networkState: v.networkState,
+                  error: v.error ? {code:v.error.code,message:v.error.message} : null,
+                  duration: v.duration,
+                  currentTime: v.currentTime,
+                  paused: v.paused,
+                  videoWidth: v.videoWidth,
+                  videoHeight: v.videoHeight,
+                  currentSrc: v.currentSrc ? '<present>' : '<empty>'
+                };
+            }""", second)
+            record['video_state'] = result
+            video = page.locator('video').first
+            shot = frames_dir / f'frame-{index:03d}-{second:05d}s.png'
+            if result.get('ok') and video.is_visible(timeout=3000):
+                video.screenshot(path=str(shot), timeout=30000)
+            else:
+                player = page.locator('#movie_player').first
+                if player.is_visible(timeout=2000):
+                    player.screenshot(path=str(shot), timeout=30000)
+                else:
+                    page.screenshot(path=str(shot), full_page=False)
+            image = Image.open(shot).convert('RGB')
+            stat = ImageStat.Stat(image)
+            record.update({
+                'status': 'captured' if result.get('ok') else 'player_error_frame',
+                'path': str(shot),
+                'bytes': shot.stat().st_size,
+                'sha256': hashlib.sha256(shot.read_bytes()).hexdigest(),
+                'width': image.width,
+                'height': image.height,
+                'mean_rgb': [round(v,2) for v in stat.mean],
+                'stddev_rgb': [round(v,2) for v in stat.stddev],
+            })
+        except Exception as exc:
+            record.update({'status':'failed','error':repr(exc)})
+        records.append(record)
+
+    state_after = page.evaluate("""() => {
+        const v = document.querySelector('video');
+        return {
+          href: location.href,
+          title: document.title,
+          bodyText: (document.body?.innerText || '').slice(0, 5000),
+          video: v ? {
+            readyState:v.readyState, networkState:v.networkState,
+            error:v.error ? {code:v.error.code,message:v.error.message}:null,
+            duration:v.duration,currentTime:v.currentTime,paused:v.paused,
+            videoWidth:v.videoWidth,videoHeight:v.videoHeight,
+            currentSrc:v.currentSrc ? '<present>' : '<empty>'
+          }:null
+        };
+    }""")
+    context.close()
+
+(root / 'page-state-after.json').write_text(json.dumps(state_after, ensure_ascii=False, indent=2), encoding='utf-8')
+(root / 'capture-records.json').write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding='utf-8')
+(root / 'browser-events.json').write_text(json.dumps(events[-500:], ensure_ascii=False, indent=2), encoding='utf-8')
+
+good = [r for r in records if r.get('status') == 'captured']
+good_paths = [Path(r['path']) for r in good]
+hashes = {r['sha256'] for r in good}
+all_paths = [Path(r['path']) for r in records if r.get('path')]
+sheet_paths = good_paths if good_paths else all_paths
+if sheet_paths:
+    thumb_w, thumb_h = 640, 360
+    cols = 2
+    rows = (len(sheet_paths)+cols-1)//cols
+    sheet = Image.new('RGB', (thumb_w*cols, thumb_h*rows), 'white')
+    draw = ImageDraw.Draw(sheet)
+    for i,path in enumerate(sheet_paths):
+        im = Image.open(path).convert('RGB')
+        im.thumbnail((thumb_w,thumb_h))
+        canvas = Image.new('RGB',(thumb_w,thumb_h),'black')
+        canvas.paste(im,((thumb_w-im.width)//2,(thumb_h-im.height)//2))
+        x=(i%cols)*thumb_w; y=(i//cols)*thumb_h
+        sheet.paste(canvas,(x,y))
+        draw.text((x+8,y+8),path.stem,fill='white',stroke_width=2,stroke_fill='black')
+    sheet.save(root/'contact-sheet.jpg','JPEG',quality=90,optimize=True)
+
+result = {
+    'status': 'actual_video_frames_captured' if len(good) >= 2 and len(hashes) >= 2 else 'failed',
+    'video_id': '7UXprjqSBvk',
+    'source_start_seconds': min(targets),
+    'source_end_seconds': max(targets),
+    'requested_frame_count': len(targets),
+    'valid_frame_count': len(good),
+    'unique_valid_hashes': len(hashes),
+    'valid_files': [p.name for p in good_paths],
+}
+(root / 'result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+
+payload = io.BytesIO()
+with zipfile.ZipFile(payload,'w',compression=zipfile.ZIP_DEFLATED) as zf:
+    for name in ['result.json','page-state-before.json','page-state-after.json','capture-records.json','browser-events.json','contact-sheet.jpg','watch-page.png']:
+        path=root/name
+        if path.exists(): zf.write(path,name)
+    for path in good_paths: zf.write(path,f'frames/{path.name}')
+raw=payload.getvalue(); encoded=base64.b64encode(raw).decode('ascii')
+chunk_size=3000
+parts=[encoded[i:i+chunk_size] for i in range(0,len(encoded),chunk_size)]
+for i,part in enumerate(parts):
+    (root/'transfer'/f'part-{i:04d}.txt').write_text(part,encoding='ascii')
+(root/'transfer-manifest.json').write_text(json.dumps({
+    'zip_bytes':len(raw),'base64_chars':len(encoded),'chunk_size':chunk_size,
+    'chunk_count':len(parts),'sha256':hashlib.sha256(raw).hexdigest(),
+    'parts':[f'part-{i:04d}.txt' for i in range(len(parts))]
+},indent=2),encoding='utf-8')
