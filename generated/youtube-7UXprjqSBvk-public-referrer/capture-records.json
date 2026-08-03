@@ -1,0 +1,194 @@
+[
+  {
+    "source_second": 1380,
+    "status": "player_error_frame",
+    "player": {
+      "ok": false,
+      "reason": "seek-function-missing",
+      "state": null
+    },
+    "path": "generated/youtube-7UXprjqSBvk-public-referrer/frames/frame-001-01380s.png",
+    "bytes": 96301,
+    "sha256": "8cbf4b6c8634893ca8a985907c86f1d47b5bed4ad073863cb4a5b144071c82fa",
+    "width": 1280,
+    "height": 720,
+    "mean_rgb": [
+      248.25,
+      248.25,
+      248.26
+    ],
+    "stddev_rgb": [
+      33.77,
+      33.71,
+      33.79
+    ]
+  },
+  {
+    "source_second": 1390,
+    "status": "player_error_frame",
+    "player": {
+      "ok": false,
+      "reason": "seek-function-missing",
+      "state": null
+    },
+    "path": "generated/youtube-7UXprjqSBvk-public-referrer/frames/frame-002-01390s.png",
+    "bytes": 96301,
+    "sha256": "8cbf4b6c8634893ca8a985907c86f1d47b5bed4ad073863cb4a5b144071c82fa",
+    "width": 1280,
+    "height": 720,
+    "mean_rgb": [
+      248.25,
+      248.25,
+      248.26
+    ],
+    "stddev_rgb": [
+      33.77,
+      33.71,
+      33.79
+    ]
+  },
+  {
+    "source_second": 1400,
+    "status": "player_error_frame",
+    "player": {
+      "ok": false,
+      "reason": "seek-function-missing",
+      "state": null
+    },
+    "path": "generated/youtube-7UXprjqSBvk-public-referrer/frames/frame-003-01400s.png",
+    "bytes": 96301,
+    "sha256": "8cbf4b6c8634893ca8a985907c86f1d47b5bed4ad073863cb4a5b144071c82fa",
+    "width": 1280,
+    "height": 720,
+    "mean_rgb": [
+      248.25,
+      248.25,
+      248.26
+    ],
+    "stddev_rgb": [
+      33.77,
+      33.71,
+      33.79
+    ]
+  },
+  {
+    "source_second": 1415,
+    "status": "player_error_frame",
+    "player": {
+      "ok": false,
+      "reason": "seek-function-missing",
+      "state": null
+    },
+    "path": "generated/youtube-7UXprjqSBvk-public-referrer/frames/frame-004-01415s.png",
+    "bytes": 96301,
+    "sha256": "8cbf4b6c8634893ca8a985907c86f1d47b5bed4ad073863cb4a5b144071c82fa",
+    "width": 1280,
+    "height": 720,
+    "mean_rgb": [
+      248.25,
+      248.25,
+      248.26
+    ],
+    "stddev_rgb": [
+      33.77,
+      33.71,
+      33.79
+    ]
+  },
+  {
+    "source_second": 1430,
+    "status": "player_error_frame",
+    "player": {
+      "ok": false,
+      "reason": "seek-function-missing",
+      "state": null
+    },
+    "path": "generated/youtube-7UXprjqSBvk-public-referrer/frames/frame-005-01430s.png",
+    "bytes": 96301,
+    "sha256": "8cbf4b6c8634893ca8a985907c86f1d47b5bed4ad073863cb4a5b144071c82fa",
+    "width": 1280,
+    "height": 720,
+    "mean_rgb": [
+      248.25,
+      248.25,
+      248.26
+    ],
+    "stddev_rgb": [
+      33.77,
+      33.71,
+      33.79
+    ]
+  },
+  {
+    "source_second": 1450,
+    "status": "player_error_frame",
+    "player": {
+      "ok": false,
+      "reason": "seek-function-missing",
+      "state": null
+    },
+    "path": "generated/youtube-7UXprjqSBvk-public-referrer/frames/frame-006-01450s.png",
+    "bytes": 96301,
+    "sha256": "8cbf4b6c8634893ca8a985907c86f1d47b5bed4ad073863cb4a5b144071c82fa",
+    "width": 1280,
+    "height": 720,
+    "mean_rgb": [
+      248.25,
+      248.25,
+      248.26
+    ],
+    "stddev_rgb": [
+      33.77,
+      33.71,
+      33.79
+    ]
+  },
+  {
+    "source_second": 1470,
+    "status": "player_error_frame",
+    "player": {
+      "ok": false,
+      "reason": "seek-function-missing",
+      "state": null
+    },
+    "path": "generated/youtube-7UXprjqSBvk-public-referrer/frames/frame-007-01470s.png",
+    "bytes": 96301,
+    "sha256": "8cbf4b6c8634893ca8a985907c86f1d47b5bed4ad073863cb4a5b144071c82fa",
+    "width": 1280,
+    "height": 720,
+    "mean_rgb": [
+      248.25,
+      248.25,
+      248.26
+    ],
+    "stddev_rgb": [
+      33.77,
+      33.71,
+      33.79
+    ]
+  },
+  {
+    "source_second": 1500,
+    "status": "player_error_frame",
+    "player": {
+      "ok": false,
+      "reason": "seek-function-missing",
+      "state": null
+    },
+    "path": "generated/youtube-7UXprjqSBvk-public-referrer/frames/frame-008-01500s.png",
+    "bytes": 96301,
+    "sha256": "8cbf4b6c8634893ca8a985907c86f1d47b5bed4ad073863cb4a5b144071c82fa",
+    "width": 1280,
+    "height": 720,
+    "mean_rgb": [
+      248.25,
+      248.25,
+      248.26
+    ],
+    "stddev_rgb": [
+      33.77,
+      33.71,
+      33.79
+    ]
+  }
+]
