@@ -1,0 +1,202 @@
+name: Inspect and use youtube2clip public API
+
+on:
+  push:
+    branches:
+      - tmp/cpptx-youtube2clip-api-20260804
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/cpptx-youtube2clip-api.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install requests beautifulsoup4 pillow
+      - name: Inspect public app JavaScript and exercise its own public endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact/js artifact/frames
+          cat > artifact/inspect.py <<'PY'
+          import hashlib
+          import json
+          import re
+          import subprocess
+          import time
+          from pathlib import Path
+          from urllib.parse import urljoin, urlparse
+
+          import requests
+          from bs4 import BeautifulSoup
+          from PIL import Image, ImageDraw, ImageStat
+
+          root=Path('artifact'); js_dir=root/'js'; frames=root/'frames'
+          base='https://youtube2clip.com/'
+          source='https://www.youtube.com/watch?v=7UXprjqSBvk'
+          session=requests.Session(); session.headers.update({'User-Agent':'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/150 Safari/537.36','Accept-Language':'en-US,en;q=0.9'})
+          report={'base':base,'source':source,'assets':[],'endpoint_candidates':[],'requests':[]}
+          html=session.get(base,timeout=60).text
+          (root/'index.html').write_text(html,encoding='utf-8')
+          soup=BeautifulSoup(html,'html.parser')
+          assets=[]
+          for tag in soup.find_all(['script','link']):
+              url=tag.get('src') or tag.get('href')
+              if not url: continue
+              full=urljoin(base,url)
+              if full not in assets and (full.endswith('.js') or '/_next/static/' in full or '/assets/' in full): assets.append(full)
+          all_text=html
+          for i,url in enumerate(assets,1):
+              item={'url':url}
+              try:
+                  r=session.get(url,timeout=60); item.update({'http_status':r.status_code,'bytes':len(r.content),'content_type':r.headers.get('content-type')})
+                  if r.status_code==200:
+                      suffix='.js' if 'javascript' in (r.headers.get('content-type') or '').lower() or url.endswith('.js') else '.txt'
+                      path=js_dir/f'asset-{i:03d}{suffix}'; path.write_bytes(r.content)
+                      try: text=r.text
+                      except Exception: text=''
+                      all_text+='\n'+text
+              except Exception as exc: item['error']=repr(exc)
+              report['assets'].append(item)
+
+          patterns=[
+              r'https?://[^"\'`\\\s]{5,300}',
+              r'[/][A-Za-z0-9_./-]*(?:api|search|clip|download|convert|video)[A-Za-z0-9_?&=./${}-]*',
+          ]
+          candidates=[]
+          for pattern in patterns:
+              for match in re.findall(pattern,all_text,re.I):
+                  value=match if isinstance(match,str) else ''.join(match)
+                  value=value.rstrip(');,]}')
+                  if any(token in value.lower() for token in ['api','search','clip','download','convert','youtube','video']):
+                      if value not in candidates: candidates.append(value)
+          report['endpoint_candidates']=candidates[:500]
+          (root/'strings.txt').write_text('\n'.join(candidates[:2000]),encoding='utf-8')
+
+          # Extract readable code windows around high-value tokens.
+          windows=[]
+          for token in ['youtube','search','clip','download','startTime','endTime','start_time','end_time','videoId','video_id','/api/']:
+              for match in re.finditer(re.escape(token),all_text,re.I):
+                  lo=max(0,match.start()-1200); hi=min(len(all_text),match.end()+1800)
+                  window=all_text[lo:hi]
+                  if window not in windows: windows.append(window)
+                  if len(windows)>=250: break
+              if len(windows)>=250: break
+          (root/'code-windows.txt').write_text('\n\n===== WINDOW =====\n\n'.join(windows),encoding='utf-8')
+
+          # Build plausible API requests from discovered same-origin routes, preserving ordinary public app semantics.
+          route_candidates=[]
+          for value in candidates:
+              if value.startswith('/'):
+                  full=urljoin(base,value)
+              elif value.startswith(('http://','https://')):
+                  full=value
+              else:
+                  continue
+              host=urlparse(full).netloc
+              if host and (host==urlparse(base).netloc or 'youtube2clip' in host):
+                  if full not in route_candidates: route_candidates.append(full)
+          common_routes=[
+              urljoin(base,'api/search'),urljoin(base,'api/video'),urljoin(base,'api/info'),urljoin(base,'api/clip'),urljoin(base,'api/download'),urljoin(base,'api/convert'),
+              urljoin(base,'api/youtube/search'),urljoin(base,'api/youtube/info'),urljoin(base,'api/youtube/clip'),
+          ]
+          for route in common_routes:
+              if route not in route_candidates: route_candidates.append(route)
+
+          payloads=[
+              {'url':source}, {'query':source}, {'videoUrl':source}, {'video_url':source}, {'youtubeUrl':source}, {'youtube_url':source},
+              {'url':source,'start':1380,'end':1500,'format':'mp4'},
+              {'videoUrl':source,'startTime':1380,'endTime':1500,'format':'mp4'},
+              {'video_id':'7UXprjqSBvk','start':1380,'end':1500,'format':'mp4'},
+          ]
+          media_urls=[]
+          def harvest(obj):
+              if isinstance(obj,dict):
+                  for k,v in obj.items():
+                      if isinstance(v,str) and v.startswith(('http://','https://')) and any(t in (k+' '+v).lower() for t in ['url','download','video','media','stream','mp4','webm','m3u8']): media_urls.append(v)
+                      else: harvest(v)
+              elif isinstance(obj,list):
+                  for v in obj: harvest(v)
+
+          for route in route_candidates[:80]:
+              for method in ['GET','POST']:
+                  for payload_index,payload in enumerate(payloads[:6] if method=='GET' else payloads,1):
+                      entry={'route':route,'method':method,'payload_index':payload_index}
+                      try:
+                          if method=='GET': r=session.get(route,params=payload,headers={'Referer':base,'Origin':base.rstrip('/')},timeout=45)
+                          else: r=session.post(route,json=payload,headers={'Referer':base,'Origin':base.rstrip('/'),'Content-Type':'application/json'},timeout=90)
+                          entry.update({'http_status':r.status_code,'content_type':r.headers.get('content-type'),'bytes':len(r.content),'body_prefix':r.text[:1800]})
+                          try:
+                              data=r.json(); harvest(data); entry['json_type']=type(data).__name__
+                          except Exception: data=None
+                          # A successful non-HTML response is enough to stop broad probing and use it.
+                          if r.status_code<400 and data is not None:
+                              entry['json']=data
+                          report['requests'].append(entry)
+                          if media_urls: break
+                      except Exception as exc: entry['error']=repr(exc); report['requests'].append(entry)
+                  if media_urls: break
+              if media_urls: break
+
+          # Redact expiring media URLs from report but use them transiently for real frame extraction.
+          unique=[]
+          for u in media_urls:
+              if u not in unique: unique.append(u)
+          report['media_url_count']=len(unique)
+          report['requests']=[{k:('<redacted>' if k=='json' else v) for k,v in entry.items()} for entry in report['requests']]
+          (root/'inspection-report.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
+
+          attempts=[]; winner=None
+          for i,url in enumerate(unique[:10],1):
+              run=root/f'run-{i:02d}'; run.mkdir(exist_ok=True)
+              modes=[['-ss','1380','-i',url,'-t','180'],['-i',url,'-ss','1380','-t','180'],['-i',url,'-t','180']]
+              for mode_index,middle in enumerate(modes,1):
+                  for p in run.glob('frame-*.jpg'): p.unlink()
+                  cmd=['ffmpeg','-hide_banner','-y','-loglevel','warning','-rw_timeout','180000000',*middle,'-an','-vf',"fps=1/15,scale='min(960,iw)':-2",'-q:v','3',str(run/'frame-%03d.jpg')]
+                  begun=time.time()
+                  try:
+                      done=subprocess.run(cmd,text=True,capture_output=True,timeout=600); imgs=sorted(run.glob('frame-*.jpg')); attempts.append({'url_index':i,'mode':mode_index,'returncode':done.returncode,'duration_seconds':round(time.time()-begun,3),'frame_count':len(imgs),'stderr_tail':done.stderr[-6000:].replace(url,'<redacted>')})
+                      if done.returncode==0 and len(imgs)>=4: winner=run; break
+                  except Exception as exc: attempts.append({'url_index':i,'mode':mode_index,'error':repr(exc)})
+              if winner: break
+          selected=[]
+          if winner:
+              raw=sorted(winner.glob('frame-*.jpg')); keep=list(range(len(raw))) if len(raw)<=15 else sorted({round(i*(len(raw)-1)/14) for i in range(15)})
+              for oi,si in enumerate(keep,1):
+                  im=Image.open(raw[si]).convert('RGB'); target=frames/f'frame-{oi:03d}.jpg'; im.save(target,'JPEG',quality=90,optimize=True); sec=1380+si*15; st=ImageStat.Stat(im); selected.append({'file':target.name,'source_second':sec,'source_timestamp':f'{sec//3600:02d}:{(sec%3600)//60:02d}:{sec%60:02d}','bytes':target.stat().st_size,'sha256':hashlib.sha256(target.read_bytes()).hexdigest(),'width':im.width,'height':im.height,'mean_rgb':[round(v,2) for v in st.mean],'stddev_rgb':[round(v,2) for v in st.stddev]})
+          hashes={x['sha256'] for x in selected}; result={'status':'actual_video_frames_captured' if len(selected)>=4 and len(hashes)>=2 else 'failed','video_id':'7UXprjqSBvk','source_start_seconds':1380,'source_end_seconds':1560,'selected_frame_count':len(selected),'unique_selected_hashes':len(hashes),'frames':selected,'ffmpeg_attempts':attempts}
+          (root/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+          if selected:
+              sheet=Image.new('RGB',(1280,360*math.ceil(len(selected)/2)),'white'); draw=ImageDraw.Draw(sheet)
+              for i,item in enumerate(selected):
+                  im=Image.open(frames/item['file']).convert('RGB'); im.thumbnail((640,360)); canvas=Image.new('RGB',(640,360),'black');canvas.paste(im,((640-im.width)//2,(360-im.height)//2));x=(i%2)*640;y=(i//2)*360;sheet.paste(canvas,(x,y));draw.text((x+10,y+10),item['source_timestamp'],fill='white',stroke_width=2,stroke_fill='black')
+              sheet.save(root/'contact-sheet.jpg','JPEG',quality=90,optimize=True)
+          for d in root.glob('run-*'):
+              if d.is_dir():
+                  for p in d.iterdir():p.unlink()
+                  d.rmdir()
+          PY
+          python artifact/inspect.py
+          rm -rf artifact/js
+          cat artifact/result.json
+      - name: Upload inspection/output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpptx-youtube2clip-api-output
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 2
