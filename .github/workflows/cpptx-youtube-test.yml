@@ -13,178 +13,228 @@ jobs:
   capture:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up Python and Deno
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
 
-      - name: Set up Deno for yt-dlp JavaScript challenges
-        uses: denoland/setup-deno@v2
-        with:
-          deno-version: v2.x
-
-      - name: Install capture tools
+      - name: Install local tools
         run: |
           python -m pip install --upgrade pip
-          python -m pip install --upgrade 'yt-dlp[default,curl-cffi]' requests
+          python -m pip install --upgrade requests playwright pillow
+          python -m playwright install chromium
           ffmpeg -version | head -n 3
-          yt-dlp --version
-          deno --version
+          docker --version
 
-      - name: Capture 23:00-28:00 from the supplied public YouTube video
+      - name: Capture real YouTube frames or segment from 23:00
         shell: bash
         run: |
           set -uo pipefail
-          ROOT='generated/youtube-7UXprjqSBvk-23m'
-          WORK="$ROOT/work"
-          mkdir -p "$WORK" "$ROOT/sample-frames"
-          URL='https://www.youtube.com/watch?v=7UXprjqSBvk'
-          : > "$ROOT/capture.log"
+          ROOT='generated/youtube-7UXprjqSBvk-23m-v2'
+          mkdir -p "$ROOT/embed-frames" "$ROOT/sample-frames"
+          rm -f "$ROOT/result.json"
 
-          run_attempt() {
-            local label="$1"
-            shift
-            rm -f "$WORK"/raw.* "$WORK"/*.part "$WORK"/*.ytdl
-            echo "===== ${label} =====" | tee -a "$ROOT/capture.log"
-            yt-dlp \
-              --newline \
-              --no-playlist \
-              --js-runtimes deno \
-              --download-sections '*00:23:00-00:28:00' \
-              --force-keyframes-at-cuts \
-              --format 'best[height<=720]/bestvideo[height<=720]' \
-              --output "$WORK/raw.%(ext)s" \
-              "$@" \
-              "$URL" 2>&1 | tee -a "$ROOT/capture.log"
-            return ${PIPESTATUS[0]}
-          }
+          echo 'Starting a same-IP YouTube trusted-session generator and self-hosted cobalt API.' | tee "$ROOT/cobalt.log"
+          docker network create cpptx-cobalt-net 2>&1 | tee -a "$ROOT/cobalt.log" || true
+          docker run -d --name cpptx-yt-session --network cpptx-cobalt-net \
+            ghcr.io/imputnet/yt-session-generator:webserver 2>&1 | tee -a "$ROOT/cobalt.log" || true
 
-          success=0
-          run_attempt 'default extractor with Deno' && success=1
-          if [[ $success -eq 0 ]]; then
-            run_attempt 'browser impersonation and embedded clients' \
-              --impersonate chrome \
-              --extractor-args 'youtube:player_client=web_safari,web_embedded,tv_embedded' && success=1
-          fi
-          if [[ $success -eq 0 ]]; then
-            run_attempt 'android and tv clients' \
-              --extractor-args 'youtube:player_client=android_vr,tv' && success=1
-          fi
+          for i in $(seq 1 45); do
+            if docker exec cpptx-yt-session python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/token', timeout=3).read()" >/dev/null 2>&1; then
+              echo 'yt-session-generator ready' | tee -a "$ROOT/cobalt.log"
+              break
+            fi
+            sleep 2
+          done
 
-          if [[ $success -eq 0 ]]; then
-            echo 'yt-dlp failed; trying public Piped API instances' | tee -a "$ROOT/capture.log"
-            python - <<'PY' 2>&1 | tee -a "$ROOT/capture.log"
+          docker logs cpptx-yt-session > "$ROOT/yt-session.log" 2>&1 || true
+          docker run -d --name cpptx-cobalt --network cpptx-cobalt-net -p 9000:9000 \
+            -e API_URL='http://localhost:9000/' \
+            -e YOUTUBE_SESSION_SERVER='http://cpptx-yt-session:8080/' \
+            -e YOUTUBE_SESSION_INNERTUBE_CLIENT='WEB_EMBEDDED' \
+            -e CUSTOM_INNERTUBE_CLIENT='WEB_EMBEDDED' \
+            -e DURATION_LIMIT='20000' \
+            ghcr.io/imputnet/cobalt:11 2>&1 | tee -a "$ROOT/cobalt.log" || true
+
+          for i in $(seq 1 45); do
+            if curl -fsS --max-time 3 http://127.0.0.1:9000/ > "$ROOT/cobalt-info.json"; then
+              echo 'cobalt ready' | tee -a "$ROOT/cobalt.log"
+              break
+            fi
+            sleep 2
+          done
+
+          python - <<'PY' 2>&1 | tee -a generated/youtube-7UXprjqSBvk-23m-v2/cobalt.log
           import json
           import subprocess
           from pathlib import Path
           import requests
 
-          root = Path('generated/youtube-7UXprjqSBvk-23m')
-          work = root / 'work'
-          video_id = '7UXprjqSBvk'
-          endpoints = [
-              'https://pipedapi.adminforge.de',
-              'https://pipedapi.leptons.xyz',
-              'https://pipedapi.kavin.rocks',
-              'https://api.piped.yt',
-          ]
-          attempts = []
-          for endpoint in endpoints:
-              try:
-                  response = requests.get(f'{endpoint}/streams/{video_id}', timeout=40)
-                  response.raise_for_status()
-                  payload = response.json()
-                  streams = [s for s in payload.get('videoStreams', []) if s.get('url')]
-                  def height(stream):
-                      q = str(stream.get('quality') or '')
-                      digits = ''.join(ch for ch in q if ch.isdigit())
-                      return int(digits or 0)
-                  candidates = [s for s in streams if 360 <= height(s) <= 720]
-                  if not candidates:
-                      candidates = streams
-                  candidates.sort(key=lambda s: (height(s), not bool(s.get('videoOnly'))), reverse=True)
-                  if not candidates:
-                      raise RuntimeError('no video streams returned')
-                  selected = candidates[0]
-                  (root / 'piped-stream.json').write_text(
-                      json.dumps({'endpoint': endpoint, 'selected': selected}, ensure_ascii=False, indent=2),
-                      encoding='utf-8',
-                  )
-                  command = [
-                      'ffmpeg', '-y', '-ss', '1380', '-i', selected['url'], '-t', '300',
-                      '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22',
-                      '-pix_fmt', 'yuv420p', str(work / 'raw.mp4'),
-                  ]
-                  completed = subprocess.run(command, text=True, capture_output=True, timeout=1000)
-                  (root / 'piped-ffmpeg.log').write_text(
-                      completed.stdout + '\n' + completed.stderr, encoding='utf-8'
-                  )
-                  if completed.returncode == 0 and (work / 'raw.mp4').stat().st_size > 100_000:
-                      attempts.append({'endpoint': endpoint, 'status': 'success'})
-                      break
-                  raise RuntimeError(f'ffmpeg failed with code {completed.returncode}')
-              except Exception as exc:
-                  attempts.append({'endpoint': endpoint, 'status': 'failed', 'error': repr(exc)})
-          (root / 'piped-attempts.json').write_text(
-              json.dumps(attempts, ensure_ascii=False, indent=2), encoding='utf-8'
-          )
-          PY
-          fi
+          root = Path('generated/youtube-7UXprjqSBvk-23m-v2')
+          source_url = 'https://www.youtube.com/watch?v=7UXprjqSBvk'
+          response_data = None
+          try:
+              response = requests.post(
+                  'http://127.0.0.1:9000/',
+                  headers={'Accept': 'application/json', 'Content-Type': 'application/json'},
+                  json={
+                      'url': source_url,
+                      'videoQuality': '720',
+                      'downloadMode': 'mute',
+                      'youtubeVideoCodec': 'h264',
+                      'youtubeVideoContainer': 'mp4',
+                      'localProcessing': 'forced',
+                      'alwaysProxy': True,
+                      'disableMetadata': True,
+                  },
+                  timeout=180,
+              )
+              (root / 'cobalt-http-status.txt').write_text(str(response.status_code), encoding='utf-8')
+              (root / 'cobalt-response.txt').write_text(response.text, encoding='utf-8')
+              response.raise_for_status()
+              response_data = response.json()
+          except Exception as exc:
+              (root / 'cobalt-exception.txt').write_text(repr(exc), encoding='utf-8')
 
-          RAW=$(find "$WORK" -maxdepth 1 -type f -name 'raw.*' -size +100k | head -n 1 || true)
-          if [[ -n "$RAW" ]]; then
-            ffmpeg -y -i "$RAW" \
-              -an -vf "scale='min(1280,iw)':-2" \
-              -c:v libx264 -preset veryfast -crf 23 -maxrate 1800k -bufsize 3600k \
-              -pix_fmt yuv420p -movflags +faststart "$ROOT/segment-23m00s-28m00s.mp4" \
-              > "$ROOT/transcode.log" 2>&1
+          media_url = None
+          if isinstance(response_data, dict):
+              status = response_data.get('status')
+              if status in {'tunnel', 'redirect'}:
+                  media_url = response_data.get('url')
+              elif status == 'local-processing':
+                  tunnels = response_data.get('tunnel') or []
+                  if tunnels:
+                      media_url = tunnels[0]
+
+          if media_url:
+              (root / 'resolved-media-url.txt').write_text(media_url, encoding='utf-8')
+              command = [
+                  'ffmpeg', '-y', '-ss', '1380', '-i', media_url, '-t', '300',
+                  '-an', '-vf', "scale='min(1280,iw)':-2",
+                  '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23',
+                  '-maxrate', '1800k', '-bufsize', '3600k', '-pix_fmt', 'yuv420p',
+                  '-movflags', '+faststart', str(root / 'segment-23m00s-28m00s.mp4'),
+              ]
+              completed = subprocess.run(command, text=True, capture_output=True, timeout=1200)
+              (root / 'cobalt-ffmpeg.log').write_text(
+                  completed.stdout + '\n' + completed.stderr, encoding='utf-8'
+              )
+          PY
+
+          docker logs cpptx-cobalt > "$ROOT/cobalt-container.log" 2>&1 || true
+
+          if [[ -s "$ROOT/segment-23m00s-28m00s.mp4" ]]; then
             ffprobe -v error -show_format -show_streams -of json \
               "$ROOT/segment-23m00s-28m00s.mp4" > "$ROOT/ffprobe.json"
-            ffmpeg -y -i "$ROOT/segment-23m00s-28m00s.mp4" \
-              -vf 'fps=1/15' -q:v 2 "$ROOT/sample-frames/frame-%03d.jpg" \
-              > "$ROOT/sample-frames.log" 2>&1
-            python - <<'PY'
+            ffmpeg -y -i "$ROOT/segment-23m00s-28m00s.mp4" -vf 'fps=1/15' -q:v 2 \
+              "$ROOT/sample-frames/frame-%03d.jpg" > "$ROOT/sample-frames.log" 2>&1
+          fi
+
+          cat > "$ROOT/embed_capture.py" <<'PY'
+          import json
+          import time
+          from pathlib import Path
+          from playwright.sync_api import sync_playwright
+
+          root = Path('generated/youtube-7UXprjqSBvk-23m-v2')
+          out = root / 'embed-frames'
+          out.mkdir(parents=True, exist_ok=True)
+          timestamps = [1380, 1395, 1410, 1425, 1440, 1470, 1500, 1530, 1560, 1590, 1620, 1650, 1680]
+          records = []
+          with sync_playwright() as p:
+              browser = p.chromium.launch(
+                  headless=True,
+                  args=['--autoplay-policy=no-user-gesture-required', '--disable-dev-shm-usage'],
+              )
+              context = browser.new_context(
+                  viewport={'width': 1280, 'height': 720},
+                  locale='ko-KR',
+                  user_agent='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+              )
+              page = context.new_page()
+              for index, second in enumerate(timestamps, 1):
+                  url = (
+                      'https://www.youtube-nocookie.com/embed/7UXprjqSBvk'
+                      f'?start={second}&autoplay=1&mute=1&controls=0&rel=0&playsinline=1'
+                  )
+                  record = {'source_second': second, 'url': url}
+                  try:
+                      page.goto(url, wait_until='domcontentloaded', timeout=60000)
+                      page.wait_for_timeout(9000)
+                      shot = out / f'frame-{index:03d}-{second:05d}s.png'
+                      page.screenshot(path=str(shot), full_page=False)
+                      record.update({
+                          'status': 'captured',
+                          'path': str(shot),
+                          'title': page.title(),
+                          'body_text': page.locator('body').inner_text(timeout=5000)[:2000],
+                      })
+                  except Exception as exc:
+                      record.update({'status': 'failed', 'error': repr(exc)})
+                  records.append(record)
+              context.storage_state(path=str(root / 'browser-storage-state.json'))
+              browser.close()
+          (root / 'embed-capture.json').write_text(
+              json.dumps(records, ensure_ascii=False, indent=2), encoding='utf-8'
+          )
+          PY
+          python "$ROOT/embed_capture.py" > "$ROOT/embed-capture.log" 2>&1 || true
+
+          python - <<'PY'
           import json
           from pathlib import Path
-          root = Path('generated/youtube-7UXprjqSBvk-23m')
-          probe = json.loads((root / 'ffprobe.json').read_text(encoding='utf-8'))
-          video = next((s for s in probe.get('streams', []) if s.get('codec_type') == 'video'), {})
+          from PIL import Image, ImageStat
+
+          root = Path('generated/youtube-7UXprjqSBvk-23m-v2')
+          segment = root / 'segment-23m00s-28m00s.mp4'
+          frames = sorted((root / 'embed-frames').glob('*.png'))
+          frame_stats = []
+          for path in frames:
+              try:
+                  image = Image.open(path).convert('RGB')
+                  stat = ImageStat.Stat(image)
+                  frame_stats.append({
+                      'path': str(path),
+                      'width': image.width,
+                      'height': image.height,
+                      'mean_rgb': [round(v, 2) for v in stat.mean],
+                      'stddev_rgb': [round(v, 2) for v in stat.stddev],
+                      'bytes': path.stat().st_size,
+                  })
+              except Exception as exc:
+                  frame_stats.append({'path': str(path), 'error': repr(exc)})
+          (root / 'embed-frame-stats.json').write_text(
+              json.dumps(frame_stats, ensure_ascii=False, indent=2), encoding='utf-8'
+          )
+          if segment.exists() and segment.stat().st_size > 100_000:
+              status = 'cobalt_segment_captured'
+          elif frames:
+              status = 'embed_frames_captured'
+          else:
+              status = 'failed'
           result = {
-              'status': 'captured',
+              'status': status,
               'video_id': '7UXprjqSBvk',
               'source_start_seconds': 1380,
               'source_end_seconds': 1680,
-              'duration_seconds': float(probe.get('format', {}).get('duration') or 0),
-              'width': video.get('width'),
-              'height': video.get('height'),
-              'codec': video.get('codec_name'),
-              'segment_file': 'segment-23m00s-28m00s.mp4',
-              'segment_bytes': (root / 'segment-23m00s-28m00s.mp4').stat().st_size,
+              'segment_exists': segment.exists(),
+              'segment_bytes': segment.stat().st_size if segment.exists() else 0,
               'sample_frame_count': len(list((root / 'sample-frames').glob('*.jpg'))),
+              'embed_frame_count': len(frames),
           }
           (root / 'result.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
           PY
-          else
-            python - <<'PY'
-          import json
-          from pathlib import Path
-          root = Path('generated/youtube-7UXprjqSBvk-23m')
-          (root / 'result.json').write_text(json.dumps({
-              'status': 'failed',
-              'video_id': '7UXprjqSBvk',
-              'source_start_seconds': 1380,
-              'source_end_seconds': 1680,
-          }, indent=2), encoding='utf-8')
-          PY
-          fi
-          rm -rf "$WORK"
+
+          rm -f "$ROOT/resolved-media-url.txt" "$ROOT/browser-storage-state.json"
+          docker rm -f cpptx-cobalt cpptx-yt-session >/dev/null 2>&1 || true
+          docker network rm cpptx-cobalt-net >/dev/null 2>&1 || true
 
       - name: Commit capture evidence back to temporary branch
         if: always()
@@ -192,11 +242,11 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add generated/youtube-7UXprjqSBvk-23m
+          git add generated/youtube-7UXprjqSBvk-23m-v2
           if git diff --cached --quiet; then
             echo 'No generated output to commit.'
           else
-            git commit -m 'ci: capture YouTube segment 23:00-28:00'
+            git commit -m 'ci: capture real YouTube frames from 23:00 (v2)'
             git push origin HEAD:${GITHUB_REF_NAME}
           fi
 
@@ -204,7 +254,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cpptx-youtube-7ux-23m
-          path: generated/youtube-7UXprjqSBvk-23m/
+          name: cpptx-youtube-7ux-23m-v2
+          path: generated/youtube-7UXprjqSBvk-23m-v2/
           if-no-files-found: error
           retention-days: 1
