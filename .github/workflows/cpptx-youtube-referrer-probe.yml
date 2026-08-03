@@ -1,0 +1,102 @@
+name: Fast YouTube referrer probe
+
+on:
+  push:
+    branches:
+      - tmp/cpptx-youtube-referrer-probe-20260804
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Probe one actual frame at 23:00
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT='generated/youtube-7UXprjqSBvk-referrer-probe'
+          rm -rf "$ROOT"
+          mkdir -p "$ROOT/site" "$ROOT/transfer"
+          python -m pip install --quiet playwright pillow
+
+          cat > "$ROOT/site/index.html" <<'HTML'
+          <!doctype html><html><head>
+          <meta name="referrer" content="strict-origin-when-cross-origin">
+          <style>html,body{margin:0;background:#000;overflow:hidden}iframe{border:0;width:1280px;height:720px;display:block}</style>
+          </head><body>
+          <iframe referrerpolicy="strict-origin-when-cross-origin"
+            src="https://www.youtube.com/embed/7UXprjqSBvk?start=1380&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=http%3A%2F%2F127.0.0.1%3A8765"
+            allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+          </body></html>
+          HTML
+          python -m http.server 8765 --bind 127.0.0.1 --directory "$ROOT/site" > "$ROOT/server.log" 2>&1 &
+          PID=$!
+          trap 'kill $PID >/dev/null 2>&1 || true' EXIT
+          sleep 1
+
+          cat > "$ROOT/probe.py" <<'PY'
+          import base64, hashlib, json, shutil
+          from pathlib import Path
+          from PIL import Image, ImageStat
+          from playwright.sync_api import sync_playwright
+
+          root=Path('generated/youtube-7UXprjqSBvk-referrer-probe')
+          chrome=(shutil.which('google-chrome') or shutil.which('google-chrome-stable') or shutil.which('chromium') or shutil.which('chromium-browser'))
+          events=[]
+          with sync_playwright() as p:
+              browser=p.chromium.launch(headless=True, executable_path=chrome, args=['--autoplay-policy=no-user-gesture-required','--disable-dev-shm-usage'])
+              page=browser.new_page(viewport={'width':1280,'height':720}, locale='ko-KR')
+              page.on('console', lambda m: events.append({'type':m.type,'text':m.text}))
+              page.on('requestfailed', lambda r: events.append({'type':'requestfailed','text':f'{r.url} :: {r.failure}'}))
+              page.goto('http://127.0.0.1:8765/index.html', wait_until='domcontentloaded', timeout=45000)
+              page.wait_for_timeout(11000)
+              page.screenshot(path=str(root/'frame-01380s.png'))
+              browser.close()
+          image=Image.open(root/'frame-01380s.png').convert('RGB')
+          image.save(root/'frame-01380s.jpg','JPEG',quality=90,optimize=True)
+          stat=ImageStat.Stat(image)
+          result={
+              'status':'captured','video_id':'7UXprjqSBvk','source_second':1380,'chrome':chrome,
+              'png_bytes':(root/'frame-01380s.png').stat().st_size,
+              'jpg_bytes':(root/'frame-01380s.jpg').stat().st_size,
+              'mean_rgb':[round(v,2) for v in stat.mean],
+              'stddev_rgb':[round(v,2) for v in stat.stddev],
+              'sha256':hashlib.sha256((root/'frame-01380s.jpg').read_bytes()).hexdigest(),
+          }
+          (root/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+          (root/'events.json').write_text(json.dumps(events,ensure_ascii=False,indent=2),encoding='utf-8')
+          payload=(root/'frame-01380s.jpg').read_bytes()
+          encoded=base64.b64encode(payload).decode('ascii')
+          size=30000
+          parts=[encoded[i:i+size] for i in range(0,len(encoded),size)]
+          for i,part in enumerate(parts):
+              (root/'transfer'/f'part-{i:03d}.txt').write_text(part,encoding='ascii')
+          (root/'transfer-manifest.json').write_text(json.dumps({
+              'bytes':len(payload),'base64_chars':len(encoded),'chunk_count':len(parts),
+              'sha256':hashlib.sha256(payload).hexdigest(),
+              'parts':[f'part-{i:03d}.txt' for i in range(len(parts))]
+          },indent=2),encoding='utf-8')
+          PY
+          python "$ROOT/probe.py" > "$ROOT/probe.log" 2>&1
+
+      - name: Commit probe
+        if: always()
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add generated/youtube-7UXprjqSBvk-referrer-probe
+          git commit -m 'ci: probe YouTube frame at 23:00' || true
+          git push origin HEAD:${GITHUB_REF_NAME}
