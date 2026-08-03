@@ -4,28 +4,31 @@ on:
   push:
     branches:
       - tmp/cpptx-youtube-7ux-23m-20260804
-  pull_request:
-    branches:
-      - main
-    paths:
-      - .github/workflows/cpptx-youtube-test.yml
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   capture:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Set up Python
+      - name: Set up Python and Deno
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Set up Deno for yt-dlp JavaScript challenges
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
 
       - name: Install capture tools
         run: |
@@ -33,54 +36,58 @@ jobs:
           python -m pip install --upgrade 'yt-dlp[default,curl-cffi]' requests
           ffmpeg -version | head -n 3
           yt-dlp --version
+          deno --version
 
       - name: Capture 23:00-28:00 from the supplied public YouTube video
         shell: bash
         run: |
           set -uo pipefail
-          mkdir -p artifact/sample-frames
+          ROOT='generated/youtube-7UXprjqSBvk-23m'
+          WORK="$ROOT/work"
+          mkdir -p "$WORK" "$ROOT/sample-frames"
           URL='https://www.youtube.com/watch?v=7UXprjqSBvk'
-          OUT='artifact/segment.%(ext)s'
-          : > artifact/capture.log
+          : > "$ROOT/capture.log"
 
           run_attempt() {
             local label="$1"
             shift
-            echo "===== ${label} =====" | tee -a artifact/capture.log
+            rm -f "$WORK"/raw.* "$WORK"/*.part "$WORK"/*.ytdl
+            echo "===== ${label} =====" | tee -a "$ROOT/capture.log"
             yt-dlp \
               --newline \
               --no-playlist \
+              --js-runtimes deno \
               --download-sections '*00:23:00-00:28:00' \
               --force-keyframes-at-cuts \
-              --format 'bestvideo[height<=720][ext=mp4]/bestvideo[height<=720]/best[height<=720]' \
-              --output "$OUT" \
+              --format 'best[height<=720]/bestvideo[height<=720]' \
+              --output "$WORK/raw.%(ext)s" \
               "$@" \
-              "$URL" 2>&1 | tee -a artifact/capture.log
+              "$URL" 2>&1 | tee -a "$ROOT/capture.log"
             return ${PIPESTATUS[0]}
           }
 
           success=0
-          run_attempt 'default extractor' && success=1
+          run_attempt 'default extractor with Deno' && success=1
           if [[ $success -eq 0 ]]; then
-            rm -f artifact/segment.* artifact/*.part
-            run_attempt 'web safari client with browser impersonation' \
+            run_attempt 'browser impersonation and embedded clients' \
               --impersonate chrome \
-              --extractor-args 'youtube:player_client=web_safari,web_embedded' && success=1
+              --extractor-args 'youtube:player_client=web_safari,web_embedded,tv_embedded' && success=1
           fi
           if [[ $success -eq 0 ]]; then
-            rm -f artifact/segment.* artifact/*.part
-            run_attempt 'tv embedded and android vr clients' \
-              --extractor-args 'youtube:player_client=tv_embedded,android_vr' && success=1
+            run_attempt 'android and tv clients' \
+              --extractor-args 'youtube:player_client=android_vr,tv' && success=1
           fi
 
           if [[ $success -eq 0 ]]; then
-            echo 'yt-dlp failed; trying public Piped API instances' | tee -a artifact/capture.log
-            python - <<'PY' 2>&1 | tee -a artifact/capture.log
+            echo 'yt-dlp failed; trying public Piped API instances' | tee -a "$ROOT/capture.log"
+            python - <<'PY' 2>&1 | tee -a "$ROOT/capture.log"
           import json
           import subprocess
           from pathlib import Path
           import requests
 
+          root = Path('generated/youtube-7UXprjqSBvk-23m')
+          work = root / 'work'
           video_id = '7UXprjqSBvk'
           endpoints = [
               'https://pipedapi.adminforge.de',
@@ -88,10 +95,10 @@ jobs:
               'https://pipedapi.kavin.rocks',
               'https://api.piped.yt',
           ]
-          log = []
+          attempts = []
           for endpoint in endpoints:
               try:
-                  response = requests.get(f'{endpoint}/streams/{video_id}', timeout=35)
+                  response = requests.get(f'{endpoint}/streams/{video_id}', timeout=40)
                   response.raise_for_status()
                   payload = response.json()
                   streams = [s for s in payload.get('videoStreams', []) if s.get('url')]
@@ -99,46 +106,55 @@ jobs:
                       q = str(stream.get('quality') or '')
                       digits = ''.join(ch for ch in q if ch.isdigit())
                       return int(digits or 0)
-                  candidates = [s for s in streams if 0 < height(s) <= 720]
+                  candidates = [s for s in streams if 360 <= height(s) <= 720]
                   if not candidates:
                       candidates = streams
-                  candidates.sort(key=lambda s: (height(s), bool(s.get('videoOnly'))), reverse=True)
+                  candidates.sort(key=lambda s: (height(s), not bool(s.get('videoOnly'))), reverse=True)
                   if not candidates:
-                      raise RuntimeError('no video stream URLs returned')
-                  stream = candidates[0]
-                  Path('artifact/piped-stream.json').write_text(
-                      json.dumps({'endpoint': endpoint, 'selected': stream}, ensure_ascii=False, indent=2),
+                      raise RuntimeError('no video streams returned')
+                  selected = candidates[0]
+                  (root / 'piped-stream.json').write_text(
+                      json.dumps({'endpoint': endpoint, 'selected': selected}, ensure_ascii=False, indent=2),
                       encoding='utf-8',
                   )
                   command = [
-                      'ffmpeg', '-y', '-ss', '1380', '-i', stream['url'], '-t', '300',
-                      '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '21',
-                      '-pix_fmt', 'yuv420p', 'artifact/segment.mp4',
+                      'ffmpeg', '-y', '-ss', '1380', '-i', selected['url'], '-t', '300',
+                      '-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22',
+                      '-pix_fmt', 'yuv420p', str(work / 'raw.mp4'),
                   ]
-                  completed = subprocess.run(command, text=True, capture_output=True, timeout=900)
-                  Path('artifact/piped-ffmpeg.log').write_text(
+                  completed = subprocess.run(command, text=True, capture_output=True, timeout=1000)
+                  (root / 'piped-ffmpeg.log').write_text(
                       completed.stdout + '\n' + completed.stderr, encoding='utf-8'
                   )
-                  if completed.returncode == 0 and Path('artifact/segment.mp4').stat().st_size > 100_000:
-                      log.append({'endpoint': endpoint, 'status': 'success'})
+                  if completed.returncode == 0 and (work / 'raw.mp4').stat().st_size > 100_000:
+                      attempts.append({'endpoint': endpoint, 'status': 'success'})
                       break
                   raise RuntimeError(f'ffmpeg failed with code {completed.returncode}')
               except Exception as exc:
-                  log.append({'endpoint': endpoint, 'status': 'failed', 'error': repr(exc)})
-          Path('artifact/piped-attempts.json').write_text(
-              json.dumps(log, ensure_ascii=False, indent=2), encoding='utf-8'
+                  attempts.append({'endpoint': endpoint, 'status': 'failed', 'error': repr(exc)})
+          (root / 'piped-attempts.json').write_text(
+              json.dumps(attempts, ensure_ascii=False, indent=2), encoding='utf-8'
           )
           PY
           fi
 
-          SEGMENT=$(find artifact -maxdepth 1 -type f \( -name 'segment.mp4' -o -name 'segment.webm' -o -name 'segment.mkv' \) -size +100k | head -n 1 || true)
-          if [[ -n "$SEGMENT" ]]; then
-            ffprobe -v error -show_format -show_streams -of json "$SEGMENT" > artifact/ffprobe.json
-            ffmpeg -y -i "$SEGMENT" -vf 'fps=1/30' -q:v 2 artifact/sample-frames/frame-%03d.jpg > artifact/sample-frames.log 2>&1
+          RAW=$(find "$WORK" -maxdepth 1 -type f -name 'raw.*' -size +100k | head -n 1 || true)
+          if [[ -n "$RAW" ]]; then
+            ffmpeg -y -i "$RAW" \
+              -an -vf "scale='min(1280,iw)':-2" \
+              -c:v libx264 -preset veryfast -crf 23 -maxrate 1800k -bufsize 3600k \
+              -pix_fmt yuv420p -movflags +faststart "$ROOT/segment-23m00s-28m00s.mp4" \
+              > "$ROOT/transcode.log" 2>&1
+            ffprobe -v error -show_format -show_streams -of json \
+              "$ROOT/segment-23m00s-28m00s.mp4" > "$ROOT/ffprobe.json"
+            ffmpeg -y -i "$ROOT/segment-23m00s-28m00s.mp4" \
+              -vf 'fps=1/15' -q:v 2 "$ROOT/sample-frames/frame-%03d.jpg" \
+              > "$ROOT/sample-frames.log" 2>&1
             python - <<'PY'
           import json
           from pathlib import Path
-          probe = json.loads(Path('artifact/ffprobe.json').read_text(encoding='utf-8'))
+          root = Path('generated/youtube-7UXprjqSBvk-23m')
+          probe = json.loads((root / 'ffprobe.json').read_text(encoding='utf-8'))
           video = next((s for s in probe.get('streams', []) if s.get('codec_type') == 'video'), {})
           result = {
               'status': 'captured',
@@ -149,16 +165,18 @@ jobs:
               'width': video.get('width'),
               'height': video.get('height'),
               'codec': video.get('codec_name'),
-              'segment_file': next(str(p) for p in Path('artifact').glob('segment.*') if p.stat().st_size > 100_000),
-              'sample_frame_count': len(list(Path('artifact/sample-frames').glob('*.jpg'))),
+              'segment_file': 'segment-23m00s-28m00s.mp4',
+              'segment_bytes': (root / 'segment-23m00s-28m00s.mp4').stat().st_size,
+              'sample_frame_count': len(list((root / 'sample-frames').glob('*.jpg'))),
           }
-          Path('artifact/result.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
+          (root / 'result.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
           PY
           else
             python - <<'PY'
           import json
           from pathlib import Path
-          Path('artifact/result.json').write_text(json.dumps({
+          root = Path('generated/youtube-7UXprjqSBvk-23m')
+          (root / 'result.json').write_text(json.dumps({
               'status': 'failed',
               'video_id': '7UXprjqSBvk',
               'source_start_seconds': 1380,
@@ -166,12 +184,27 @@ jobs:
           }, indent=2), encoding='utf-8')
           PY
           fi
+          rm -rf "$WORK"
+
+      - name: Commit capture evidence back to temporary branch
+        if: always()
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add generated/youtube-7UXprjqSBvk-23m
+          if git diff --cached --quiet; then
+            echo 'No generated output to commit.'
+          else
+            git commit -m 'ci: capture YouTube segment 23:00-28:00'
+            git push origin HEAD:${GITHUB_REF_NAME}
+          fi
 
       - name: Upload capture artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cpptx-youtube-7ux-23m
-          path: artifact/
+          path: generated/youtube-7UXprjqSBvk-23m/
           if-no-files-found: error
           retention-days: 1
