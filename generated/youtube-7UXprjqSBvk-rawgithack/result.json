@@ -1,0 +1,26 @@
+{
+  "status": "failed",
+  "http_status": 200,
+  "initial": {
+    "title": "External Content Notice | rawgit.hack",
+    "href": "https://raw.githack.com/lunaticaug/claude-skills/82e2251cc0b70621f45e0dc979ddaa2cbadd98df/tools/cpptx-youtube-player.html?start=1380",
+    "state": null,
+    "iframe": null,
+    "body": " rawgit.hack\nStatus Source code Report abuse\nLocal-first API testing Bruno runs on your machine. No account, no cloud. Download Bruno\nusebruno.com\nAds by EthicalAds\n\nOne more step\nThis HTML page is hosted on raw.githubusercontent.com and proxied as-is.\nrawgit.hack does not review third-party content.\n\nYou're going to open: \nOpen the page\nGo to homepage\n\nNot sure about the source? Avoid entering passwords, personal details, or payment information on the page.\n\n© 2013 — 2026 Pavel Puchkin\nSushi icon designed by Linda Yuki Nakanishi from The Noun Project."
+  },
+  "seek": {
+    "ok": false,
+    "reason": "missing"
+  },
+  "frame_bytes": 94618,
+  "mean_rgb": [
+    247.95,
+    247.4,
+    247.53
+  ],
+  "stddev_rgb": [
+    31.61,
+    32.71,
+    32.73
+  ]
+}
