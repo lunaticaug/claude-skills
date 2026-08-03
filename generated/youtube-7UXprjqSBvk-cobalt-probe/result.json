@@ -1,0 +1,12 @@
+{
+  "status": "failed",
+  "video_id": "7UXprjqSBvk",
+  "source_second": 1380,
+  "session_ready": false,
+  "cobalt_ready": true,
+  "cobalt_status": null,
+  "cobalt_error": null,
+  "media_url_resolved": false,
+  "ffmpeg_code": null,
+  "error": "HTTPError('400 Client Error: Bad Request for url: http://127.0.0.1:19000/')"
+}
