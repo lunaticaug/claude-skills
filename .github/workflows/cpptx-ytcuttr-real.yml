@@ -1,0 +1,190 @@
+name: Capture actual YouTube seminar frames through YTCuttr
+
+on:
+  push:
+    branches:
+      - tmp/cpptx-ytcuttr-real-20260804
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/cpptx-ytcuttr-real.yml
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright pillow requests
+          sudo apt-get update -qq && sudo apt-get install -y -qq xvfb
+      - name: Use YTCuttr normal anonymous UI for 23:00-23:20
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact/downloads artifact/frames artifact/evidence artifact/profile
+          cat > artifact/drive.py <<'PY'
+          import json,re,time
+          from pathlib import Path
+          from urllib.parse import urlparse
+          from playwright.sync_api import sync_playwright
+
+          root=Path('artifact');downloads=root/'downloads';evidence=root/'evidence';events=[];requests_log=[];responses=[];candidates=[];download_log=[]
+          source='https://www.youtube.com/watch?v=7UXprjqSBvk'
+          def clean_url(url):
+              p=urlparse(url);return f'{p.scheme}://{p.netloc}{p.path}' if p.scheme else url
+          def add_url(url,source):
+              if isinstance(url,str) and url.startswith(('http://','https://')):
+                  low=url.lower()
+                  if any(x in low for x in ['download','.mp4','.webm','.m3u8','clip','storage','signed']):candidates.append({'url':url,'source':source})
+          def harvest(v,source='json'):
+              if isinstance(v,dict):
+                  for k,x in v.items():
+                      if isinstance(x,str):add_url(x,f'{source}:{k}')
+                      else:harvest(x,f'{source}:{k}')
+              elif isinstance(v,list):
+                  for x in v:harvest(x,source)
+          def snapshot(page,label):
+              try:
+                  state=page.evaluate("""()=>({url:location.href,title:document.title,body:(document.body?.innerText||'').slice(0,15000),inputs:[...document.querySelectorAll('input')].map((e,i)=>({i,type:e.type,name:e.name,id:e.id,placeholder:e.placeholder,value:e.value,visible:!!(e.offsetWidth||e.offsetHeight||e.getClientRects().length)})),selects:[...document.querySelectorAll('select')].map((e,i)=>({i,name:e.name,id:e.id,value:e.value,options:[...e.options].map(o=>({value:o.value,text:o.text,selected:o.selected})),visible:!!(e.offsetWidth||e.offsetHeight||e.getClientRects().length)})),buttons:[...document.querySelectorAll('button,a,[role=button]')].map((e,i)=>({i,text:(e.innerText||e.getAttribute('aria-label')||'').trim().slice(0,260),href:e.href||'',disabled:!!e.disabled,visible:!!(e.offsetWidth||e.offsetHeight||e.getClientRects().length)})).filter(x=>x.visible).slice(0,250)})""")
+                  (evidence/f'{label}.json').write_text(json.dumps(state,ensure_ascii=False,indent=2),encoding='utf-8');page.screenshot(path=str(evidence/f'{label}.png'))
+              except Exception as exc:(evidence/f'{label}-error.txt').write_text(repr(exc),encoding='utf-8')
+          with sync_playwright() as p:
+              context=p.chromium.launch_persistent_context(str(root/'profile'),executable_path='/usr/bin/google-chrome',headless=False,viewport={'width':1440,'height':1000},locale='en-US',timezone_id='Asia/Seoul',accept_downloads=True,ignore_default_args=['--enable-automation'],args=['--disable-blink-features=AutomationControlled','--disable-dev-shm-usage','--no-first-run','--no-default-browser-check','--window-size=1440,1000'])
+              context.add_init_script("Object.defineProperty(navigator,'webdriver',{get:()=>undefined});")
+              page=context.pages[0] if context.pages else context.new_page()
+              page.on('console',lambda m:events.append({'type':f'console:{m.type}','text':m.text[:3000]}));page.on('requestfailed',lambda r:events.append({'type':'requestfailed','text':f'{clean_url(r.url)} :: {r.failure}'[:3000]}))
+              page.on('request',lambda r:requests_log.append({'method':r.method,'resource_type':r.resource_type,'url':clean_url(r.url),'post_data':(r.post_data or '')[:12000]}) if r.method!='GET' or r.resource_type in {'xhr','fetch'} else None)
+              def on_response(r):
+                  try:
+                      ct=(r.headers.get('content-type') or '').lower();disp=r.headers.get('content-disposition') or '';entry={'status':r.status,'url':clean_url(r.url),'content_type':ct,'content_disposition':disp,'method':r.request.method}
+                      if 'json' in ct:
+                          try:data=r.json();harvest(data,r.url);entry['json']=data
+                          except Exception as exc:entry['json_error']=repr(exc)
+                      elif ct.startswith('video/') or 'attachment' in disp.lower():add_url(r.url,f'response:{ct}')
+                      if r.request.method!='GET' or r.request.resource_type in {'xhr','fetch'} or 'api' in r.url:responses.append(entry)
+                  except Exception:pass
+              page.on('response',on_response)
+              def on_download(d):
+                  try:path=downloads/(d.suggested_filename or f'download-{len(download_log)+1}.bin');d.save_as(str(path));download_log.append({'file':path.name,'bytes':path.stat().st_size})
+                  except Exception as exc:download_log.append({'error':repr(exc)})
+              page.on('download',on_download)
+              page.goto('https://ytcuttr.com/',wait_until='domcontentloaded',timeout=90000);page.wait_for_timeout(5000);snapshot(page,'01-landing')
+              inputs=page.locator("input[type=url],input[type=text]");url_input=None
+              for i in range(inputs.count()):
+                  loc=inputs.nth(i)
+                  try:
+                      if loc.is_visible(timeout=300) and re.search(r'youtube|url|link|paste',((loc.get_attribute('placeholder') or '')+' '+(loc.get_attribute('aria-label') or '')),re.I):url_input=loc;break
+                  except Exception:pass
+              if url_input is None:url_input=inputs.first
+              url_input.fill(source)
+              try:page.get_by_role('button',name=re.compile(r'get video|continue',re.I)).first.click(timeout=5000)
+              except Exception:url_input.press('Enter')
+              deadline=time.time()+150
+              while time.time()<deadline:
+                  body=page.locator('body').inner_text(timeout=5000)
+                  if 'Ready to clip' in body and 'Download Clip' in body:break
+                  page.wait_for_timeout(2000)
+              snapshot(page,'02-loaded')
+              visible=[]
+              for i in range(page.locator('input').count()):
+                  loc=page.locator('input').nth(i)
+                  try:
+                      if loc.is_visible(timeout=300):
+                          ph=(loc.get_attribute('placeholder') or '')+' '+(loc.get_attribute('aria-label') or '')+' '+(loc.get_attribute('name') or '')
+                          if re.search(r'start|end|HH:MM:SS|time',ph,re.I):visible.append((loc,ph))
+                  except Exception:pass
+              start=next((loc for loc,ph in visible if re.search(r'start',ph,re.I)),visible[0][0] if visible else None);end=next((loc for loc,ph in visible if re.search(r'end',ph,re.I)),visible[1][0] if len(visible)>1 else None)
+              if start is None or end is None:raise RuntimeError(f'time inputs not found: {visible}')
+              start.fill('00:23:00');start.press('Tab');end.fill('00:23:20');end.press('Tab')
+              for i in range(page.locator('select').count()):
+                  loc=page.locator('select').nth(i)
+                  try:
+                      if not loc.is_visible(timeout=300):continue
+                      opts=loc.locator('option').all_text_contents();joined=' '.join(opts).lower()
+                      for target in ['360','480','720']:
+                          if target in joined:
+                              for opt in loc.locator('option').all():
+                                  if target in opt.inner_text():loc.select_option(value=opt.get_attribute('value'));raise StopIteration
+                  except StopIteration:pass
+                  except Exception:pass
+              snapshot(page,'03-range-set')
+              button=page.get_by_role('button',name=re.compile(r'download clip',re.I)).first;button.click(timeout=8000);snapshot(page,'04-submitted')
+              deadline=time.time()+900;last=0
+              while time.time()<deadline and not download_log:
+                  body=page.locator('body').inner_text(timeout=5000)
+                  for pattern in [r'^download$',r'download clip',r'download again']:
+                      try:
+                          action=page.get_by_role('button',name=re.compile(pattern,re.I)).first
+                          if action.is_visible(timeout=400) and ('processing' not in body.lower() or 'ready' in body.lower()):action.click(timeout=3000);page.wait_for_timeout(2000)
+                      except Exception:pass
+                  if time.time()-last>60:snapshot(page,f'05-progress-{int(time.time())}');last=time.time()
+                  page.wait_for_timeout(3000)
+              snapshot(page,'06-final');context.close()
+          unique=[]
+          for x in candidates:
+              if x['url'] not in [y['url'] for y in unique]:unique.append(x)
+          (root/'.candidates.json').write_text(json.dumps(unique,ensure_ascii=False),encoding='utf-8');(root/'requests.json').write_text(json.dumps(requests_log,ensure_ascii=False,indent=2),encoding='utf-8');(root/'responses.json').write_text(json.dumps(responses,ensure_ascii=False,indent=2),encoding='utf-8');(root/'events.json').write_text(json.dumps(events[-2000:],ensure_ascii=False,indent=2),encoding='utf-8');(root/'downloads.json').write_text(json.dumps(download_log,ensure_ascii=False,indent=2),encoding='utf-8')
+          PY
+          xvfb-run -a -s '-screen 0 1440x1000x24' python artifact/drive.py > artifact/browser.log 2>&1 || true
+          rm -rf artifact/profile
+          python - <<'PY'
+          import json,shutil,subprocess
+          from pathlib import Path
+          from urllib.parse import urlparse
+          import requests
+          root=Path('artifact');out=root/'youtube-7UXprjqSBvk-23m00s-23m20s.mp4';attempts=[]
+          for p in (root/'downloads').glob('*'):
+              if p.is_file() and p.stat().st_size>100000:
+                  probe=subprocess.run(['ffprobe','-v','error','-show_entries','stream=codec_type','-of','json',str(p)],text=True,capture_output=True);attempts.append({'kind':'download','file':p.name,'bytes':p.stat().st_size,'probe':probe.returncode})
+                  if probe.returncode==0 and 'video' in probe.stdout:shutil.copy2(p,out);break
+          if not out.exists():
+              items=json.loads((root/'.candidates.json').read_text()) if (root/'.candidates.json').exists() else [];s=requests.Session();s.headers.update({'User-Agent':'Mozilla/5.0 Chrome/150','Referer':'https://ytcuttr.com/'})
+              for i,item in enumerate(items[:30],1):
+                  u=item['url'];entry={'kind':'url','index':i,'host':urlparse(u).netloc,'source':item.get('source')}
+                  try:
+                      r=s.get(u,stream=True,timeout=180);entry.update({'status':r.status_code,'type':r.headers.get('content-type')});r.raise_for_status();tmp=root/f'candidate-{i}.bin'
+                      with tmp.open('wb') as f:
+                          for chunk in r.iter_content(1024*1024):
+                              if chunk:f.write(chunk)
+                      probe=subprocess.run(['ffprobe','-v','error','-show_entries','stream=codec_type','-of','json',str(tmp)],text=True,capture_output=True);entry.update({'bytes':tmp.stat().st_size,'probe':probe.returncode})
+                      if probe.returncode==0 and 'video' in probe.stdout:shutil.move(tmp,out);attempts.append(entry);break
+                      tmp.unlink(missing_ok=True)
+                  except Exception as exc:entry['error']=repr(exc)
+                  attempts.append(entry)
+          (root/'collection.json').write_text(json.dumps(attempts,ensure_ascii=False,indent=2),encoding='utf-8')
+          PY
+          rm -f artifact/.candidates.json artifact/candidate-*.bin
+          if [[ -s artifact/youtube-7UXprjqSBvk-23m00s-23m20s.mp4 ]]; then ffprobe -v error -show_format -show_streams -of json artifact/youtube-7UXprjqSBvk-23m00s-23m20s.mp4 > artifact/ffprobe.json;ffmpeg -y -i artifact/youtube-7UXprjqSBvk-23m00s-23m20s.mp4 -vf 'fps=2,scale=1280:-2' -q:v 2 artifact/frames/frame-%03d.jpg > artifact/ffmpeg.log 2>&1;fi
+          python - <<'PY'
+          import hashlib,json,math
+          from pathlib import Path
+          from PIL import Image,ImageDraw,ImageStat
+          root=Path('artifact');video=root/'youtube-7UXprjqSBvk-23m00s-23m20s.mp4';paths=sorted((root/'frames').glob('*.jpg'));items=[]
+          for i,p in enumerate(paths):
+              im=Image.open(p).convert('RGB');st=ImageStat.Stat(im);sec=1380+i/2;items.append({'file':p.name,'source_second':sec,'source_timestamp':f'{int(sec)//3600:02d}:{(int(sec)%3600)//60:02d}:{int(sec)%60:02d}.{int((sec%1)*10)}','bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'width':im.width,'height':im.height,'mean_rgb':[round(x,2) for x in st.mean],'stddev_rgb':[round(x,2) for x in st.stddev]})
+          hashes={x['sha256'] for x in items};result={'status':'actual_video_clip_captured' if video.exists() and video.stat().st_size>100000 and len(items)>=4 and len(hashes)>=2 else 'failed','video_id':'7UXprjqSBvk','source_start_seconds':1380,'source_end_seconds':1400,'video_file':video.name if video.exists() else None,'video_bytes':video.stat().st_size if video.exists() else 0,'frame_count':len(items),'unique_frame_hashes':len(hashes),'frames':items};(root/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+          if items:
+              cols=4;w,h=320,180;sheet=Image.new('RGB',(cols*w,math.ceil(len(items)/cols)*h),'white');draw=ImageDraw.Draw(sheet)
+              for i,item in enumerate(items):
+                  im=Image.open(root/'frames'/item['file']).convert('RGB');im.thumbnail((w,h));canvas=Image.new('RGB',(w,h),'black');canvas.paste(im,((w-im.width)//2,(h-im.height)//2));x=(i%cols)*w;y=(i//cols)*h;sheet.paste(canvas,(x,y));draw.text((x+6,y+6),item['source_timestamp'],fill='white',stroke_width=2,stroke_fill='black')
+              sheet.save(root/'contact-sheet.jpg','JPEG',quality=90,optimize=True)
+          PY
+          cat artifact/result.json
+      - name: Upload output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpptx-ytcuttr-real-output
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 2
