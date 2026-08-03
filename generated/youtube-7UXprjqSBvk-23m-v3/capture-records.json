@@ -1,0 +1,378 @@
+[
+  {
+    "source_second": 1380,
+    "host": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk",
+    "url": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk?start=1380&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&modestbranding=1",
+    "status": "captured",
+    "http_status": 200,
+    "path": "generated/youtube-7UXprjqSBvk-23m-v3/frames/candidate-001-h1-01380s.png",
+    "title": "YouTube",
+    "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류",
+    "bytes": 11805,
+    "sha256": "ecd8c91d8a88bff9a903036f242512d29b7dfb7e77c3b9bf5295ed29d6c0427c",
+    "mean_rgb": [
+      40.98,
+      40.98,
+      40.98
+    ],
+    "stddev_rgb": [
+      11.91,
+      11.9,
+      11.89
+    ],
+    "visual_score": 36.884,
+    "selected": true
+  },
+  {
+    "source_second": 1380,
+    "host": "https://www.youtube.com/embed/7UXprjqSBvk",
+    "url": "https://www.youtube.com/embed/7UXprjqSBvk?start=1380&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&modestbranding=1",
+    "status": "captured",
+    "http_status": 200,
+    "path": "generated/youtube-7UXprjqSBvk-23m-v3/frames/candidate-001-h2-01380s.png",
+    "title": "YouTube",
+    "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류",
+    "bytes": 11805,
+    "sha256": "ecd8c91d8a88bff9a903036f242512d29b7dfb7e77c3b9bf5295ed29d6c0427c",
+    "mean_rgb": [
+      40.98,
+      40.98,
+      40.98
+    ],
+    "stddev_rgb": [
+      11.91,
+      11.9,
+      11.89
+    ],
+    "visual_score": 36.884
+  },
+  {
+    "source_second": 1395,
+    "host": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk",
+    "url": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk?start=1395&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&modestbranding=1",
+    "status": "captured",
+    "http_status": 200,
+    "path": "generated/youtube-7UXprjqSBvk-23m-v3/frames/candidate-002-h1-01395s.png",
+    "title": "YouTube",
+    "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류",
+    "bytes": 11805,
+    "sha256": "ecd8c91d8a88bff9a903036f242512d29b7dfb7e77c3b9bf5295ed29d6c0427c",
+    "mean_rgb": [
+      40.98,
+      40.98,
+      40.98
+    ],
+    "stddev_rgb": [
+      11.91,
+      11.9,
+      11.89
+    ],
+    "visual_score": 36.884,
+    "selected": true
+  },
+  {
+    "source_second": 1395,
+    "host": "https://www.youtube.com/embed/7UXprjqSBvk",
+    "url": "https://www.youtube.com/embed/7UXprjqSBvk?start=1395&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&modestbranding=1",
+    "status": "captured",
+    "http_status": 200,
+    "path": "generated/youtube-7UXprjqSBvk-23m-v3/frames/candidate-002-h2-01395s.png",
+    "title": "YouTube",
+    "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류",
+    "bytes": 11805,
+    "sha256": "ecd8c91d8a88bff9a903036f242512d29b7dfb7e77c3b9bf5295ed29d6c0427c",
+    "mean_rgb": [
+      40.98,
+      40.98,
+      40.98
+    ],
+    "stddev_rgb": [
+      11.91,
+      11.9,
+      11.89
+    ],
+    "visual_score": 36.884
+  },
+  {
+    "source_second": 1410,
+    "host": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk",
+    "url": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk?start=1410&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&modestbranding=1",
+    "status": "captured",
+    "http_status": 200,
+    "path": "generated/youtube-7UXprjqSBvk-23m-v3/frames/candidate-003-h1-01410s.png",
+    "title": "YouTube",
+    "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류",
+    "bytes": 11805,
+    "sha256": "ecd8c91d8a88bff9a903036f242512d29b7dfb7e77c3b9bf5295ed29d6c0427c",
+    "mean_rgb": [
+      40.98,
+      40.98,
+      40.98
+    ],
+    "stddev_rgb": [
+      11.91,
+      11.9,
+      11.89
+    ],
+    "visual_score": 36.884,
+    "selected": true
+  },
+  {
+    "source_second": 1410,
+    "host": "https://www.youtube.com/embed/7UXprjqSBvk",
+    "url": "https://www.youtube.com/embed/7UXprjqSBvk?start=1410&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&modestbranding=1",
+    "status": "captured",
+    "http_status": 200,
+    "path": "generated/youtube-7UXprjqSBvk-23m-v3/frames/candidate-003-h2-01410s.png",
+    "title": "YouTube",
+    "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류",
+    "bytes": 11805,
+    "sha256": "ecd8c91d8a88bff9a903036f242512d29b7dfb7e77c3b9bf5295ed29d6c0427c",
+    "mean_rgb": [
+      40.98,
+      40.98,
+      40.98
+    ],
+    "stddev_rgb": [
+      11.91,
+      11.9,
+      11.89
+    ],
+    "visual_score": 36.884
+  },
+  {
+    "source_second": 1430,
+    "host": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk",
+    "url": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk?start=1430&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&modestbranding=1",
+    "status": "captured",
+    "http_status": 200,
+    "path": "generated/youtube-7UXprjqSBvk-23m-v3/frames/candidate-004-h1-01430s.png",
+    "title": "YouTube",
+    "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류",
+    "bytes": 11805,
+    "sha256": "ecd8c91d8a88bff9a903036f242512d29b7dfb7e77c3b9bf5295ed29d6c0427c",
+    "mean_rgb": [
+      40.98,
+      40.98,
+      40.98
+    ],
+    "stddev_rgb": [
+      11.91,
+      11.9,
+      11.89
+    ],
+    "visual_score": 36.884,
+    "selected": true
+  },
+  {
+    "source_second": 1430,
+    "host": "https://www.youtube.com/embed/7UXprjqSBvk",
+    "url": "https://www.youtube.com/embed/7UXprjqSBvk?start=1430&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&modestbranding=1",
+    "status": "captured",
+    "http_status": 200,
+    "path": "generated/youtube-7UXprjqSBvk-23m-v3/frames/candidate-004-h2-01430s.png",
+    "title": "YouTube",
+    "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류",
+    "bytes": 11805,
+    "sha256": "ecd8c91d8a88bff9a903036f242512d29b7dfb7e77c3b9bf5295ed29d6c0427c",
+    "mean_rgb": [
+      40.98,
+      40.98,
+      40.98
+    ],
+    "stddev_rgb": [
+      11.91,
+      11.9,
+      11.89
+    ],
+    "visual_score": 36.884
+  },
+  {
+    "source_second": 1460,
+    "host": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk",
+    "url": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk?start=1460&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&modestbranding=1",
+    "status": "captured",
+    "http_status": 200,
+    "path": "generated/youtube-7UXprjqSBvk-23m-v3/frames/candidate-005-h1-01460s.png",
+    "title": "YouTube",
+    "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류",
+    "bytes": 11805,
+    "sha256": "ecd8c91d8a88bff9a903036f242512d29b7dfb7e77c3b9bf5295ed29d6c0427c",
+    "mean_rgb": [
+      40.98,
+      40.98,
+      40.98
+    ],
+    "stddev_rgb": [
+      11.91,
+      11.9,
+      11.89
+    ],
+    "visual_score": 36.884,
+    "selected": true
+  },
+  {
+    "source_second": 1460,
+    "host": "https://www.youtube.com/embed/7UXprjqSBvk",
+    "url": "https://www.youtube.com/embed/7UXprjqSBvk?start=1460&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&modestbranding=1",
+    "status": "captured",
+    "http_status": 200,
+    "path": "generated/youtube-7UXprjqSBvk-23m-v3/frames/candidate-005-h2-01460s.png",
+    "title": "YouTube",
+    "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류",
+    "bytes": 11805,
+    "sha256": "ecd8c91d8a88bff9a903036f242512d29b7dfb7e77c3b9bf5295ed29d6c0427c",
+    "mean_rgb": [
+      40.98,
+      40.98,
+      40.98
+    ],
+    "stddev_rgb": [
+      11.91,
+      11.9,
+      11.89
+    ],
+    "visual_score": 36.884
+  },
+  {
+    "source_second": 1500,
+    "host": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk",
+    "url": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk?start=1500&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&modestbranding=1",
+    "status": "captured",
+    "http_status": 200,
+    "path": "generated/youtube-7UXprjqSBvk-23m-v3/frames/candidate-006-h1-01500s.png",
+    "title": "YouTube",
+    "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류",
+    "bytes": 11805,
+    "sha256": "ecd8c91d8a88bff9a903036f242512d29b7dfb7e77c3b9bf5295ed29d6c0427c",
+    "mean_rgb": [
+      40.98,
+      40.98,
+      40.98
+    ],
+    "stddev_rgb": [
+      11.91,
+      11.9,
+      11.89
+    ],
+    "visual_score": 36.884,
+    "selected": true
+  },
+  {
+    "source_second": 1500,
+    "host": "https://www.youtube.com/embed/7UXprjqSBvk",
+    "url": "https://www.youtube.com/embed/7UXprjqSBvk?start=1500&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&modestbranding=1",
+    "status": "captured",
+    "http_status": 200,
+    "path": "generated/youtube-7UXprjqSBvk-23m-v3/frames/candidate-006-h2-01500s.png",
+    "title": "YouTube",
+    "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류",
+    "bytes": 11805,
+    "sha256": "ecd8c91d8a88bff9a903036f242512d29b7dfb7e77c3b9bf5295ed29d6c0427c",
+    "mean_rgb": [
+      40.98,
+      40.98,
+      40.98
+    ],
+    "stddev_rgb": [
+      11.91,
+      11.9,
+      11.89
+    ],
+    "visual_score": 36.884
+  },
+  {
+    "source_second": 1560,
+    "host": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk",
+    "url": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk?start=1560&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&modestbranding=1",
+    "status": "captured",
+    "http_status": 200,
+    "path": "generated/youtube-7UXprjqSBvk-23m-v3/frames/candidate-007-h1-01560s.png",
+    "title": "YouTube",
+    "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류",
+    "bytes": 11805,
+    "sha256": "ecd8c91d8a88bff9a903036f242512d29b7dfb7e77c3b9bf5295ed29d6c0427c",
+    "mean_rgb": [
+      40.98,
+      40.98,
+      40.98
+    ],
+    "stddev_rgb": [
+      11.91,
+      11.9,
+      11.89
+    ],
+    "visual_score": 36.884,
+    "selected": true
+  },
+  {
+    "source_second": 1560,
+    "host": "https://www.youtube.com/embed/7UXprjqSBvk",
+    "url": "https://www.youtube.com/embed/7UXprjqSBvk?start=1560&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&modestbranding=1",
+    "status": "captured",
+    "http_status": 200,
+    "path": "generated/youtube-7UXprjqSBvk-23m-v3/frames/candidate-007-h2-01560s.png",
+    "title": "YouTube",
+    "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류",
+    "bytes": 11805,
+    "sha256": "ecd8c91d8a88bff9a903036f242512d29b7dfb7e77c3b9bf5295ed29d6c0427c",
+    "mean_rgb": [
+      40.98,
+      40.98,
+      40.98
+    ],
+    "stddev_rgb": [
+      11.91,
+      11.9,
+      11.89
+    ],
+    "visual_score": 36.884
+  },
+  {
+    "source_second": 1620,
+    "host": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk",
+    "url": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk?start=1620&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&modestbranding=1",
+    "status": "captured",
+    "http_status": 200,
+    "path": "generated/youtube-7UXprjqSBvk-23m-v3/frames/candidate-008-h1-01620s.png",
+    "title": "YouTube",
+    "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류",
+    "bytes": 11805,
+    "sha256": "ecd8c91d8a88bff9a903036f242512d29b7dfb7e77c3b9bf5295ed29d6c0427c",
+    "mean_rgb": [
+      40.98,
+      40.98,
+      40.98
+    ],
+    "stddev_rgb": [
+      11.91,
+      11.9,
+      11.89
+    ],
+    "visual_score": 36.884,
+    "selected": true
+  },
+  {
+    "source_second": 1620,
+    "host": "https://www.youtube.com/embed/7UXprjqSBvk",
+    "url": "https://www.youtube.com/embed/7UXprjqSBvk?start=1620&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&modestbranding=1",
+    "status": "captured",
+    "http_status": 200,
+    "path": "generated/youtube-7UXprjqSBvk-23m-v3/frames/candidate-008-h2-01620s.png",
+    "title": "YouTube",
+    "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류",
+    "bytes": 11805,
+    "sha256": "ecd8c91d8a88bff9a903036f242512d29b7dfb7e77c3b9bf5295ed29d6c0427c",
+    "mean_rgb": [
+      40.98,
+      40.98,
+      40.98
+    ],
+    "stddev_rgb": [
+      11.91,
+      11.9,
+      11.89
+    ],
+    "visual_score": 36.884
+  }
+]

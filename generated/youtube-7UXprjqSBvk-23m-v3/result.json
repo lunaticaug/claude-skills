@@ -1,0 +1,74 @@
+{
+  "status": "embed_frames_captured",
+  "video_id": "7UXprjqSBvk",
+  "source_start_seconds": 1380,
+  "source_end_seconds": 1620,
+  "selected_frame_count": 8,
+  "unique_selected_hashes": 1,
+  "suspicious_text_hits": [
+    {
+      "source_second": 1380,
+      "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류"
+    },
+    {
+      "source_second": 1380,
+      "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류"
+    },
+    {
+      "source_second": 1395,
+      "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류"
+    },
+    {
+      "source_second": 1395,
+      "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류"
+    },
+    {
+      "source_second": 1410,
+      "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류"
+    },
+    {
+      "source_second": 1410,
+      "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류"
+    },
+    {
+      "source_second": 1430,
+      "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류"
+    },
+    {
+      "source_second": 1430,
+      "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류"
+    },
+    {
+      "source_second": 1460,
+      "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류"
+    },
+    {
+      "source_second": 1460,
+      "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류"
+    },
+    {
+      "source_second": 1500,
+      "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류"
+    },
+    {
+      "source_second": 1500,
+      "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류"
+    },
+    {
+      "source_second": 1560,
+      "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류"
+    },
+    {
+      "source_second": 1560,
+      "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류"
+    },
+    {
+      "source_second": 1620,
+      "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류"
+    },
+    {
+      "source_second": 1620,
+      "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류"
+    }
+  ]
+}
