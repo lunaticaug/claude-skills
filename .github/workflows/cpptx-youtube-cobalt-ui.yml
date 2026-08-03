@@ -1,0 +1,440 @@
+name: Capture real YouTube frames through normal Cobalt web UI
+
+on:
+  push:
+    branches:
+      - tmp/cpptx-youtube-cobalt-ui-20260804
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/cpptx-youtube-cobalt-ui.yml
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install browser and media tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright pillow
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb
+          google-chrome --version
+          ffmpeg -version | head -n 3
+
+      - name: Use the public web UI normally and capture the resulting media stream
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT='artifact'
+          mkdir -p "$ROOT/frames" "$ROOT/ui-evidence"
+
+          cat > "$ROOT/resolve_ui.py" <<'PY'
+          import json
+          import re
+          import time
+          from pathlib import Path
+          from urllib.parse import urlparse
+
+          from playwright.sync_api import sync_playwright
+
+          root = Path('artifact')
+          evidence = root / 'ui-evidence'
+          source_url = 'https://www.youtube.com/watch?v=7UXprjqSBvk'
+          frontends = [
+              'https://cobalt.clxxped.lol/',
+              'https://cobalt.meowing.de/',
+              'https://cobalt.eversiege.network/',
+              'https://cobalt.tools/',
+          ]
+          user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36'
+          media_urls = []
+          records = []
+          event_log = []
+
+          def sanitize(payload):
+              if isinstance(payload, dict):
+                  clean = {}
+                  for key, value in payload.items():
+                      if key in {'url', 'tunnel', 'picker', 'audio', 'video'}:
+                          if key == 'url':
+                              clean[key] = '<redacted-media-url>' if value else value
+                          elif key == 'tunnel' and isinstance(value, list):
+                              clean[key] = ['<redacted-media-url>' for _ in value]
+                          elif key == 'picker' and isinstance(value, list):
+                              clean[key] = [
+                                  {k: ('<redacted-media-url>' if k in {'url', 'thumb'} else sanitize(v)) for k, v in item.items()}
+                                  if isinstance(item, dict) else '<redacted>'
+                                  for item in value
+                              ]
+                          else:
+                              clean[key] = '<redacted>'
+                      else:
+                          clean[key] = sanitize(value)
+                  return clean
+              if isinstance(payload, list):
+                  return [sanitize(item) for item in payload]
+              return payload
+
+          def collect_from_payload(payload):
+              if not isinstance(payload, dict):
+                  return
+              status = payload.get('status')
+              if status in {'tunnel', 'redirect'} and payload.get('url'):
+                  media_urls.append(payload['url'])
+              elif status == 'local-processing':
+                  media_urls.extend(payload.get('tunnel') or [])
+              elif status == 'picker':
+                  for item in payload.get('picker') or []:
+                      if isinstance(item, dict) and item.get('url') and item.get('type') in {'video', 'gif'}:
+                          media_urls.append(item['url'])
+
+          with sync_playwright() as p:
+              context = p.chromium.launch_persistent_context(
+                  str(root / 'profile'),
+                  executable_path='/usr/bin/google-chrome',
+                  headless=False,
+                  viewport={'width': 1440, 'height': 1000},
+                  locale='ko-KR',
+                  timezone_id='Asia/Seoul',
+                  user_agent=user_agent,
+                  ignore_default_args=['--enable-automation'],
+                  accept_downloads=True,
+                  args=[
+                      '--autoplay-policy=no-user-gesture-required',
+                      '--disable-blink-features=AutomationControlled',
+                      '--disable-dev-shm-usage',
+                      '--no-first-run',
+                      '--no-default-browser-check',
+                      '--window-size=1440,1000',
+                  ],
+              )
+              context.add_init_script("""
+                  Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                  Object.defineProperty(navigator, 'languages', {get: () => ['ko-KR','ko','en-US','en']});
+                  Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3,4,5]});
+              """)
+
+              for frontend_index, frontend in enumerate(frontends, 1):
+                  if media_urls:
+                      break
+                  page = context.new_page()
+                  record = {'frontend': frontend, 'frontend_index': frontend_index}
+                  response_payloads = []
+
+                  def on_console(message):
+                      event_log.append({'frontend': frontend, 'type': f'console:{message.type}', 'text': message.text[:2000]})
+
+                  def on_request_failed(request):
+                      event_log.append({'frontend': frontend, 'type': 'requestfailed', 'text': f'{request.url} :: {request.failure}'[:2000]})
+
+                  def on_response(response):
+                      try:
+                          content_type = (response.headers.get('content-type') or '').lower()
+                          if 'application/json' not in content_type:
+                              return
+                          if response.request.method != 'POST' and 'api' not in response.url:
+                              return
+                          payload = response.json()
+                          response_payloads.append({
+                              'url_host': urlparse(response.url).netloc,
+                              'http_status': response.status,
+                              'payload': sanitize(payload),
+                          })
+                          collect_from_payload(payload)
+                      except Exception:
+                          return
+
+                  def on_download(download):
+                      try:
+                          url = download.url
+                          if url and not url.startswith(('blob:', 'data:')):
+                              media_urls.append(url)
+                          download.cancel()
+                      except Exception:
+                          pass
+
+                  page.on('console', on_console)
+                  page.on('requestfailed', on_request_failed)
+                  page.on('response', on_response)
+                  page.on('download', on_download)
+
+                  try:
+                      response = page.goto(frontend, wait_until='domcontentloaded', timeout=90000)
+                      record['http_status'] = response.status if response else None
+                      page.wait_for_timeout(10000)
+                      record['title'] = page.title()
+                      record['loaded_url'] = page.url
+
+                      candidates = page.locator("input:not([type='hidden']):not([type='checkbox']):not([type='radio']), textarea")
+                      input_count = candidates.count()
+                      record['input_count'] = input_count
+                      filled = False
+                      for input_index in range(input_count):
+                          locator = candidates.nth(input_index)
+                          try:
+                              if not locator.is_visible(timeout=700):
+                                  continue
+                              input_type = (locator.get_attribute('type') or '').lower()
+                              placeholder = locator.get_attribute('placeholder') or ''
+                              aria = locator.get_attribute('aria-label') or ''
+                              record.setdefault('inputs', []).append({
+                                  'index': input_index,
+                                  'type': input_type,
+                                  'placeholder': placeholder,
+                                  'aria_label': aria,
+                              })
+                              if input_type in {'text', 'url', 'search', ''} or re.search(r'link|url|paste|링크|주소', placeholder + ' ' + aria, re.I):
+                                  locator.fill(source_url)
+                                  filled = True
+                                  record['filled_input_index'] = input_index
+                                  break
+                          except Exception as exc:
+                              record.setdefault('input_errors', []).append(repr(exc))
+
+                      if not filled:
+                          record['error'] = 'no visible URL/text input found'
+                      else:
+                          page.wait_for_timeout(2000)
+                          # Submit through the page's normal form/UI, without bypassing its authentication controls.
+                          submitted = False
+                          try:
+                              locator = candidates.nth(record['filled_input_index'])
+                              locator.press('Enter')
+                              submitted = True
+                              record['submit_method'] = 'enter'
+                          except Exception:
+                              pass
+
+                          page.wait_for_timeout(5000)
+                          if not media_urls:
+                              labels = ['save', 'download', '저장', '다운로드', 'continue', '계속']
+                              buttons = page.locator('button, [role=button], input[type=submit]')
+                              for button_index in range(buttons.count()):
+                                  button = buttons.nth(button_index)
+                                  try:
+                                      if not button.is_visible(timeout=400):
+                                          continue
+                                      text = ((button.inner_text(timeout=500) or '') + ' ' + (button.get_attribute('aria-label') or '')).strip()
+                                      if any(label.lower() in text.lower() for label in labels):
+                                          button.click(timeout=5000)
+                                          submitted = True
+                                          record.setdefault('clicked_buttons', []).append(text[:200])
+                                          page.wait_for_timeout(5000)
+                                          if media_urls:
+                                              break
+                                  except Exception:
+                                      continue
+
+                          if not media_urls:
+                              # A standards-compliant form submission is a final normal-UI fallback.
+                              try:
+                                  form_count = page.locator('form').count()
+                                  record['form_count'] = form_count
+                                  if form_count:
+                                      page.locator('form').first.evaluate('(form) => form.requestSubmit()')
+                                      submitted = True
+                                      record['submit_method_fallback'] = 'requestSubmit'
+                              except Exception as exc:
+                                  record['form_submit_error'] = repr(exc)
+
+                          deadline = time.time() + 95
+                          while time.time() < deadline and not media_urls:
+                              page.wait_for_timeout(2000)
+
+                          record['submitted'] = submitted
+                          record['media_url_count'] = len(media_urls)
+
+                      record['response_payloads'] = response_payloads
+                      record['body_text'] = page.locator('body').inner_text(timeout=5000)[:5000]
+                      page.screenshot(path=str(evidence / f'frontend-{frontend_index:02d}.png'), full_page=False)
+                      (evidence / f'frontend-{frontend_index:02d}.html').write_text(page.content(), encoding='utf-8')
+                  except Exception as exc:
+                      record['exception'] = repr(exc)
+                      try:
+                          page.screenshot(path=str(evidence / f'frontend-{frontend_index:02d}-exception.png'), full_page=False)
+                      except Exception:
+                          pass
+                  records.append(record)
+                  page.close()
+
+              context.close()
+
+          # De-duplicate, keep only remotely fetchable URLs, and store them transiently.
+          deduped = []
+          for url in media_urls:
+              if url and url.startswith(('http://', 'https://')) and url not in deduped:
+                  deduped.append(url)
+          (root / '.media-urls').write_text('\n'.join(deduped), encoding='utf-8')
+          (root / 'ui-result.json').write_text(json.dumps({
+              'status': 'media_resolved' if deduped else 'failed',
+              'source_url': source_url,
+              'media_url_count': len(deduped),
+              'frontends': records,
+          }, ensure_ascii=False, indent=2), encoding='utf-8')
+          (root / 'ui-events.json').write_text(json.dumps(event_log[-1000:], ensure_ascii=False, indent=2), encoding='utf-8')
+          PY
+
+          xvfb-run -a -s '-screen 0 1440x1000x24' python "$ROOT/resolve_ui.py" > "$ROOT/ui-run.log" 2>&1 || true
+          rm -rf "$ROOT/profile"
+
+          cat > "$ROOT/extract_frames.py" <<'PY'
+          import hashlib
+          import json
+          import math
+          import subprocess
+          import time
+          from pathlib import Path
+          from urllib.parse import urlparse
+
+          from PIL import Image, ImageDraw, ImageStat
+
+          root = Path('artifact')
+          frames_dir = root / 'frames'
+          media_file = root / '.media-urls'
+          urls = [line.strip() for line in media_file.read_text(encoding='utf-8').splitlines() if line.strip()] if media_file.exists() else []
+          start_s, end_s = 1380, 1740
+          attempts = []
+          winner = None
+          user_agent = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36'
+
+          for url_index, url in enumerate(urls, 1):
+              run_dir = root / f'ffmpeg-{url_index:02d}'
+              run_dir.mkdir(exist_ok=True)
+              patterns = [
+                  ['-ss', str(start_s), '-i', url, '-t', str(end_s - start_s)],
+                  ['-i', url, '-ss', str(start_s), '-t', str(end_s - start_s)],
+              ]
+              for mode_index, middle in enumerate(patterns, 1):
+                  for path in run_dir.glob('frame-*.jpg'):
+                      path.unlink()
+                  command = [
+                      'ffmpeg', '-hide_banner', '-y', '-loglevel', 'warning',
+                      '-rw_timeout', '120000000',
+                      '-user_agent', user_agent,
+                      *middle,
+                      '-an', '-vf', "fps=1/15,scale='min(960,iw)':-2",
+                      '-q:v', '3', str(run_dir / 'frame-%03d.jpg'),
+                  ]
+                  safe = ['<redacted-media-url>' if part == url else part for part in command]
+                  started = time.time()
+                  try:
+                      completed = subprocess.run(command, text=True, capture_output=True, timeout=720)
+                      paths = sorted(run_dir.glob('frame-*.jpg'))
+                      attempt = {
+                          'url_index': url_index,
+                          'url_host': urlparse(url).netloc,
+                          'mode_index': mode_index,
+                          'command': safe,
+                          'returncode': completed.returncode,
+                          'duration_seconds': round(time.time() - started, 3),
+                          'frame_count': len(paths),
+                          'stderr_tail': completed.stderr[-10000:].replace(url, '<redacted-media-url>'),
+                      }
+                      attempts.append(attempt)
+                      if completed.returncode == 0 and len(paths) >= 4:
+                          winner = run_dir
+                          break
+                  except Exception as exc:
+                      attempts.append({
+                          'url_index': url_index,
+                          'url_host': urlparse(url).netloc,
+                          'mode_index': mode_index,
+                          'error': repr(exc),
+                          'duration_seconds': round(time.time() - started, 3),
+                      })
+              if winner:
+                  break
+
+          selected = []
+          if winner:
+              raw = sorted(winner.glob('frame-*.jpg'))
+              indexes = list(range(len(raw))) if len(raw) <= 25 else sorted({round(i * (len(raw) - 1) / 24) for i in range(25)})
+              for output_index, source_index in enumerate(indexes, 1):
+                  source = raw[source_index]
+                  target = frames_dir / f'frame-{output_index:03d}.jpg'
+                  image = Image.open(source).convert('RGB')
+                  image.save(target, 'JPEG', quality=88, optimize=True)
+                  second = start_s + source_index * 15
+                  stat = ImageStat.Stat(image)
+                  selected.append({
+                      'file': target.name,
+                      'source_second': second,
+                      'source_timestamp': f'{second // 3600:02d}:{(second % 3600) // 60:02d}:{second % 60:02d}',
+                      'bytes': target.stat().st_size,
+                      'sha256': hashlib.sha256(target.read_bytes()).hexdigest(),
+                      'width': image.width,
+                      'height': image.height,
+                      'mean_rgb': [round(v, 2) for v in stat.mean],
+                      'stddev_rgb': [round(v, 2) for v in stat.stddev],
+                  })
+
+          hashes = {item['sha256'] for item in selected}
+          result = {
+              'status': 'actual_video_frames_captured' if len(selected) >= 4 and len(hashes) >= 2 else 'failed',
+              'video_id': '7UXprjqSBvk',
+              'source_start_seconds': start_s,
+              'source_end_seconds': end_s,
+              'selected_frame_count': len(selected),
+              'unique_selected_hashes': len(hashes),
+              'frames': selected,
+              'ffmpeg_attempts': attempts,
+          }
+          (root / 'result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+
+          if selected:
+              cols, thumb_w, thumb_h = 2, 640, 360
+              rows = math.ceil(len(selected) / cols)
+              sheet = Image.new('RGB', (cols * thumb_w, rows * thumb_h), 'white')
+              draw = ImageDraw.Draw(sheet)
+              for index, item in enumerate(selected):
+                  image = Image.open(frames_dir / item['file']).convert('RGB')
+                  image.thumbnail((thumb_w, thumb_h), Image.Resampling.LANCZOS)
+                  canvas = Image.new('RGB', (thumb_w, thumb_h), 'black')
+                  canvas.paste(image, ((thumb_w - image.width) // 2, (thumb_h - image.height) // 2))
+                  x, y = (index % cols) * thumb_w, (index // cols) * thumb_h
+                  sheet.paste(canvas, (x, y))
+                  draw.rectangle((x + 7, y + 7, x + 135, y + 35), fill='black')
+                  draw.text((x + 13, y + 13), item['source_timestamp'], fill='white')
+              sheet.save(root / 'contact-sheet.jpg', 'JPEG', quality=90, optimize=True)
+
+          for path in root.glob('ffmpeg-*'):
+              if path.is_dir():
+                  for child in path.iterdir():
+                      child.unlink()
+                  path.rmdir()
+          PY
+
+          python "$ROOT/extract_frames.py"
+          rm -f "$ROOT/.media-urls"
+          cat "$ROOT/result.json"
+
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root = Path('artifact')
+          with zipfile.ZipFile(root / 'cpptx-youtube-cobalt-ui-output.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+              for path in sorted(root.rglob('*')):
+                  if path.is_file() and path.name != 'cpptx-youtube-cobalt-ui-output.zip':
+                      archive.write(path, path.relative_to(root))
+          PY
+
+      - name: Upload output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpptx-youtube-cobalt-ui-output
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 2
