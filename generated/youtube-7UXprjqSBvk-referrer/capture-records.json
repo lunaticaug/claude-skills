@@ -1,0 +1,346 @@
+[
+  {
+    "source_second": 1380,
+    "host": "youtube",
+    "url": "http://127.0.0.1:8765/player.html?start=1380&host=youtube",
+    "status": "captured",
+    "path": "generated/youtube-7UXprjqSBvk-referrer/frames/candidate-001-youtube-01380s.png",
+    "bytes": 10876,
+    "sha256": "445e3cc4a58450191da77c2755876a3de434fb21845ae4bcff0144086cd0744e",
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.86,
+      11.8,
+      11.79
+    ],
+    "visual_score": 37.264,
+    "iframe_src": "https://www.youtube.com/embed/7UXprjqSBvk?start=1380&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=http%3A%2F%2F127.0.0.1%3A8765",
+    "selected": true
+  },
+  {
+    "source_second": 1380,
+    "host": "nocookie",
+    "url": "http://127.0.0.1:8765/player.html?start=1380&host=nocookie",
+    "status": "captured",
+    "path": "generated/youtube-7UXprjqSBvk-referrer/frames/candidate-001-nocookie-01380s.png",
+    "bytes": 10876,
+    "sha256": "445e3cc4a58450191da77c2755876a3de434fb21845ae4bcff0144086cd0744e",
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.86,
+      11.8,
+      11.79
+    ],
+    "visual_score": 37.264,
+    "iframe_src": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk?start=1380&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=http%3A%2F%2F127.0.0.1%3A8765"
+  },
+  {
+    "source_second": 1395,
+    "host": "youtube",
+    "url": "http://127.0.0.1:8765/player.html?start=1395&host=youtube",
+    "status": "captured",
+    "path": "generated/youtube-7UXprjqSBvk-referrer/frames/candidate-002-youtube-01395s.png",
+    "bytes": 10876,
+    "sha256": "445e3cc4a58450191da77c2755876a3de434fb21845ae4bcff0144086cd0744e",
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.86,
+      11.8,
+      11.79
+    ],
+    "visual_score": 37.264,
+    "iframe_src": "https://www.youtube.com/embed/7UXprjqSBvk?start=1395&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=http%3A%2F%2F127.0.0.1%3A8765",
+    "selected": true
+  },
+  {
+    "source_second": 1395,
+    "host": "nocookie",
+    "url": "http://127.0.0.1:8765/player.html?start=1395&host=nocookie",
+    "status": "captured",
+    "path": "generated/youtube-7UXprjqSBvk-referrer/frames/candidate-002-nocookie-01395s.png",
+    "bytes": 10876,
+    "sha256": "445e3cc4a58450191da77c2755876a3de434fb21845ae4bcff0144086cd0744e",
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.86,
+      11.8,
+      11.79
+    ],
+    "visual_score": 37.264,
+    "iframe_src": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk?start=1395&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=http%3A%2F%2F127.0.0.1%3A8765"
+  },
+  {
+    "source_second": 1410,
+    "host": "youtube",
+    "url": "http://127.0.0.1:8765/player.html?start=1410&host=youtube",
+    "status": "captured",
+    "path": "generated/youtube-7UXprjqSBvk-referrer/frames/candidate-003-youtube-01410s.png",
+    "bytes": 10876,
+    "sha256": "445e3cc4a58450191da77c2755876a3de434fb21845ae4bcff0144086cd0744e",
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.86,
+      11.8,
+      11.79
+    ],
+    "visual_score": 37.264,
+    "iframe_src": "https://www.youtube.com/embed/7UXprjqSBvk?start=1410&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=http%3A%2F%2F127.0.0.1%3A8765",
+    "selected": true
+  },
+  {
+    "source_second": 1410,
+    "host": "nocookie",
+    "url": "http://127.0.0.1:8765/player.html?start=1410&host=nocookie",
+    "status": "captured",
+    "path": "generated/youtube-7UXprjqSBvk-referrer/frames/candidate-003-nocookie-01410s.png",
+    "bytes": 10876,
+    "sha256": "445e3cc4a58450191da77c2755876a3de434fb21845ae4bcff0144086cd0744e",
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.86,
+      11.8,
+      11.79
+    ],
+    "visual_score": 37.264,
+    "iframe_src": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk?start=1410&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=http%3A%2F%2F127.0.0.1%3A8765"
+  },
+  {
+    "source_second": 1430,
+    "host": "youtube",
+    "url": "http://127.0.0.1:8765/player.html?start=1430&host=youtube",
+    "status": "captured",
+    "path": "generated/youtube-7UXprjqSBvk-referrer/frames/candidate-004-youtube-01430s.png",
+    "bytes": 10876,
+    "sha256": "445e3cc4a58450191da77c2755876a3de434fb21845ae4bcff0144086cd0744e",
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.86,
+      11.8,
+      11.79
+    ],
+    "visual_score": 37.264,
+    "iframe_src": "https://www.youtube.com/embed/7UXprjqSBvk?start=1430&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=http%3A%2F%2F127.0.0.1%3A8765",
+    "selected": true
+  },
+  {
+    "source_second": 1430,
+    "host": "nocookie",
+    "url": "http://127.0.0.1:8765/player.html?start=1430&host=nocookie",
+    "status": "captured",
+    "path": "generated/youtube-7UXprjqSBvk-referrer/frames/candidate-004-nocookie-01430s.png",
+    "bytes": 10876,
+    "sha256": "445e3cc4a58450191da77c2755876a3de434fb21845ae4bcff0144086cd0744e",
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.86,
+      11.8,
+      11.79
+    ],
+    "visual_score": 37.264,
+    "iframe_src": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk?start=1430&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=http%3A%2F%2F127.0.0.1%3A8765"
+  },
+  {
+    "source_second": 1460,
+    "host": "youtube",
+    "url": "http://127.0.0.1:8765/player.html?start=1460&host=youtube",
+    "status": "captured",
+    "path": "generated/youtube-7UXprjqSBvk-referrer/frames/candidate-005-youtube-01460s.png",
+    "bytes": 10876,
+    "sha256": "445e3cc4a58450191da77c2755876a3de434fb21845ae4bcff0144086cd0744e",
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.86,
+      11.8,
+      11.79
+    ],
+    "visual_score": 37.264,
+    "iframe_src": "https://www.youtube.com/embed/7UXprjqSBvk?start=1460&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=http%3A%2F%2F127.0.0.1%3A8765",
+    "selected": true
+  },
+  {
+    "source_second": 1460,
+    "host": "nocookie",
+    "url": "http://127.0.0.1:8765/player.html?start=1460&host=nocookie",
+    "status": "captured",
+    "path": "generated/youtube-7UXprjqSBvk-referrer/frames/candidate-005-nocookie-01460s.png",
+    "bytes": 10876,
+    "sha256": "445e3cc4a58450191da77c2755876a3de434fb21845ae4bcff0144086cd0744e",
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.86,
+      11.8,
+      11.79
+    ],
+    "visual_score": 37.264,
+    "iframe_src": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk?start=1460&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=http%3A%2F%2F127.0.0.1%3A8765"
+  },
+  {
+    "source_second": 1500,
+    "host": "youtube",
+    "url": "http://127.0.0.1:8765/player.html?start=1500&host=youtube",
+    "status": "captured",
+    "path": "generated/youtube-7UXprjqSBvk-referrer/frames/candidate-006-youtube-01500s.png",
+    "bytes": 10876,
+    "sha256": "445e3cc4a58450191da77c2755876a3de434fb21845ae4bcff0144086cd0744e",
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.86,
+      11.8,
+      11.79
+    ],
+    "visual_score": 37.264,
+    "iframe_src": "https://www.youtube.com/embed/7UXprjqSBvk?start=1500&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=http%3A%2F%2F127.0.0.1%3A8765",
+    "selected": true
+  },
+  {
+    "source_second": 1500,
+    "host": "nocookie",
+    "url": "http://127.0.0.1:8765/player.html?start=1500&host=nocookie",
+    "status": "captured",
+    "path": "generated/youtube-7UXprjqSBvk-referrer/frames/candidate-006-nocookie-01500s.png",
+    "bytes": 10876,
+    "sha256": "445e3cc4a58450191da77c2755876a3de434fb21845ae4bcff0144086cd0744e",
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.86,
+      11.8,
+      11.79
+    ],
+    "visual_score": 37.264,
+    "iframe_src": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk?start=1500&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=http%3A%2F%2F127.0.0.1%3A8765"
+  },
+  {
+    "source_second": 1560,
+    "host": "youtube",
+    "url": "http://127.0.0.1:8765/player.html?start=1560&host=youtube",
+    "status": "captured",
+    "path": "generated/youtube-7UXprjqSBvk-referrer/frames/candidate-007-youtube-01560s.png",
+    "bytes": 10876,
+    "sha256": "445e3cc4a58450191da77c2755876a3de434fb21845ae4bcff0144086cd0744e",
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.86,
+      11.8,
+      11.79
+    ],
+    "visual_score": 37.264,
+    "iframe_src": "https://www.youtube.com/embed/7UXprjqSBvk?start=1560&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=http%3A%2F%2F127.0.0.1%3A8765",
+    "selected": true
+  },
+  {
+    "source_second": 1560,
+    "host": "nocookie",
+    "url": "http://127.0.0.1:8765/player.html?start=1560&host=nocookie",
+    "status": "captured",
+    "path": "generated/youtube-7UXprjqSBvk-referrer/frames/candidate-007-nocookie-01560s.png",
+    "bytes": 10876,
+    "sha256": "445e3cc4a58450191da77c2755876a3de434fb21845ae4bcff0144086cd0744e",
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.86,
+      11.8,
+      11.79
+    ],
+    "visual_score": 37.264,
+    "iframe_src": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk?start=1560&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=http%3A%2F%2F127.0.0.1%3A8765"
+  },
+  {
+    "source_second": 1620,
+    "host": "youtube",
+    "url": "http://127.0.0.1:8765/player.html?start=1620&host=youtube",
+    "status": "captured",
+    "path": "generated/youtube-7UXprjqSBvk-referrer/frames/candidate-008-youtube-01620s.png",
+    "bytes": 10876,
+    "sha256": "445e3cc4a58450191da77c2755876a3de434fb21845ae4bcff0144086cd0744e",
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.86,
+      11.8,
+      11.79
+    ],
+    "visual_score": 37.264,
+    "iframe_src": "https://www.youtube.com/embed/7UXprjqSBvk?start=1620&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=http%3A%2F%2F127.0.0.1%3A8765",
+    "selected": true
+  },
+  {
+    "source_second": 1620,
+    "host": "nocookie",
+    "url": "http://127.0.0.1:8765/player.html?start=1620&host=nocookie",
+    "status": "captured",
+    "path": "generated/youtube-7UXprjqSBvk-referrer/frames/candidate-008-nocookie-01620s.png",
+    "bytes": 10876,
+    "sha256": "445e3cc4a58450191da77c2755876a3de434fb21845ae4bcff0144086cd0744e",
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.86,
+      11.8,
+      11.79
+    ],
+    "visual_score": 37.264,
+    "iframe_src": "https://www.youtube-nocookie.com/embed/7UXprjqSBvk?start=1620&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=http%3A%2F%2F127.0.0.1%3A8765"
+  }
+]

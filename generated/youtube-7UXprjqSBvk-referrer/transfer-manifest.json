@@ -1,0 +1,14 @@
+{
+  "zip_bytes": 120485,
+  "base64_chars": 160648,
+  "chunk_size": 40000,
+  "chunk_count": 5,
+  "sha256": "e389a35ecd1770da39e9a96f4896ca19f3b0ef44230ce5b29c0c70d042c6a335",
+  "parts": [
+    "part-0000.txt",
+    "part-0001.txt",
+    "part-0002.txt",
+    "part-0003.txt",
+    "part-0004.txt"
+  ]
+}

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: black; }
+    iframe { display: block; width: 1280px; height: 720px; border: 0; }
+  </style>
+</head>
+<body>
+  <iframe id="player" referrerpolicy="strict-origin-when-cross-origin"
+    allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+  <script>
+    const p = new URLSearchParams(location.search);
+    const start = p.get('start') || '1380';
+    const host = p.get('host') === 'nocookie'
+      ? 'https://www.youtube-nocookie.com'
+      : 'https://www.youtube.com';
+    const origin = encodeURIComponent(location.origin);
+    document.getElementById('player').src =
+      `${host}/embed/7UXprjqSBvk?start=${start}&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=${origin}`;
+  </script>
+</body>
+</html>

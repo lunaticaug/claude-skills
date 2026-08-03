@@ -1,0 +1,19 @@
+{
+  "status": "captured",
+  "video_id": "7UXprjqSBvk",
+  "source_start_seconds": 1380,
+  "source_end_seconds": 1620,
+  "selected_frame_count": 8,
+  "unique_selected_hashes": 1,
+  "selected_files": [
+    "frame-001-01380s.jpg",
+    "frame-002-01395s.jpg",
+    "frame-003-01410s.jpg",
+    "frame-004-01430s.jpg",
+    "frame-005-01460s.jpg",
+    "frame-006-01500s.jpg",
+    "frame-007-01560s.jpg",
+    "frame-008-01620s.jpg"
+  ],
+  "contact_sheet": "contact-sheet.jpg"
+}
