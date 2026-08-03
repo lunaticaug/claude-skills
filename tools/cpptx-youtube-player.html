@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>cpptx YouTube capture probe</title>
+  <style>
+    html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000}
+    #player{width:1280px;height:720px}
+    iframe{display:block;border:0;width:1280px!important;height:720px!important}
+  </style>
+</head>
+<body>
+<div id="player"></div>
+<script>
+  const q = new URLSearchParams(location.search);
+  const initialStart = Number(q.get('start') || 1380);
+  window.__ytState = {apiReady:false, ready:false, error:null, state:null, initialStart, events:[]};
+  window.onYouTubeIframeAPIReady = function () {
+    window.__ytState.apiReady = true;
+    window.__ytPlayer = new YT.Player('player', {
+      width: 1280,
+      height: 720,
+      videoId: '7UXprjqSBvk',
+      host: 'https://www.youtube.com',
+      playerVars: {
+        autoplay: 1,
+        mute: 1,
+        controls: 0,
+        rel: 0,
+        playsinline: 1,
+        start: initialStart,
+        origin: location.origin,
+        enablejsapi: 1
+      },
+      events: {
+        onReady: (event) => {
+          window.__ytState.ready = true;
+          window.__ytState.events.push({type:'ready', at:Date.now()});
+          event.target.mute();
+          event.target.seekTo(initialStart, true);
+          event.target.playVideo();
+        },
+        onStateChange: (event) => {
+          window.__ytState.state = event.data;
+          window.__ytState.events.push({type:'state', value:event.data, at:Date.now()});
+        },
+        onError: (event) => {
+          window.__ytState.error = event.data;
+          window.__ytState.events.push({type:'error', value:event.data, at:Date.now()});
+        }
+      }
+    });
+  };
+  window.seekAndPause = async function(second) {
+    const p = window.__ytPlayer;
+    if (!p || !window.__ytState.ready) return {ok:false, reason:'not-ready', state:window.__ytState};
+    p.mute();
+    p.seekTo(second, true);
+    p.playVideo();
+    await new Promise(r => setTimeout(r, 3500));
+    p.pauseVideo();
+    return {
+      ok: window.__ytState.error == null,
+      requested: second,
+      currentTime: p.getCurrentTime(),
+      duration: p.getDuration(),
+      playerState: p.getPlayerState(),
+      videoUrl: p.getVideoUrl(),
+      quality: p.getPlaybackQuality(),
+      loadedFraction: p.getVideoLoadedFraction(),
+      state: window.__ytState
+    };
+  };
+</script>
+<script src="https://www.youtube.com/iframe_api"></script>
+</body>
+</html>
