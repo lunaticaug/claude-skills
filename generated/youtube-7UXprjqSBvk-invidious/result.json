@@ -1,0 +1,14 @@
+{
+  "status": "failed",
+  "video_id": "7UXprjqSBvk",
+  "selected_instance": null,
+  "source_start_seconds": 1380,
+  "source_end_seconds": 1500,
+  "segment_exists": false,
+  "segment_bytes": 0,
+  "actual_frame_count": 0,
+  "storyboard_frame_count": 0,
+  "chosen_frame_count": 0,
+  "unique_chosen_hashes": 0,
+  "chosen_files": []
+}

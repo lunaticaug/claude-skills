@@ -1,0 +1,224 @@
+[
+  {
+    "instance": "https://inv.nadeko.net",
+    "url": "https://inv.nadeko.net/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 403,
+    "content_type": "text/plain",
+    "bytes": 17,
+    "status": "api_failed",
+    "body_prefix": "Endpoint disabled"
+  },
+  {
+    "instance": "https://invidious.nerdvpn.de",
+    "url": "https://invidious.nerdvpn.de/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 401,
+    "content_type": "text/html",
+    "bytes": 574,
+    "status": "api_failed",
+    "body_prefix": "<html>\r\n<head><title>401 Authorization Required</title></head>\r\n<body>\r\n<center><h1>401 Authorization Required</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a padding to disable MSIE and Chrome friendly error pag"
+  },
+  {
+    "instance": "https://yt.chocolatemoo53.com",
+    "url": "https://yt.chocolatemoo53.com/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 403,
+    "content_type": "text/plain; charset=utf-8",
+    "bytes": 10,
+    "status": "api_failed",
+    "body_prefix": "forbidden\n"
+  },
+  {
+    "instance": "https://invidious.tiekoetter.com",
+    "url": "https://invidious.tiekoetter.com/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 403,
+    "content_type": "text/html",
+    "bytes": 554,
+    "status": "api_failed",
+    "body_prefix": "<html>\r\n<head><title>403 Forbidden</title></head>\r\n<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n<hr><center>Luna-HTTP/S</center>\r\n</body>\r\n</html>\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a paddin"
+  },
+  {
+    "instance": "https://invidious.f5.si",
+    "url": "https://invidious.f5.si/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 200,
+    "content_type": "text/html; charset=utf-8",
+    "bytes": 4391,
+    "status": "api_failed",
+    "body_prefix": "<!doctype html><html lang=\"en\"><head><title>Making sure you&#39;re not a bot!</title><link rel=\"stylesheet\" href=\"/.within.website/x/xess/xess.min.css?cachebuster=1.24.0\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\"><meta name=\"robots\" content=\"noindex,nofollow\"><style>\n        body,\n        html {\n            height: 100%;\n            display: flex;\n            justify-content: center;\n            align-items: center;\n            margin-left: auto;\n            margin-ri"
+  },
+  {
+    "instance": "https://inv.zoomerville.com",
+    "url": "https://inv.zoomerville.com/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 403,
+    "content_type": "text/html",
+    "bytes": 548,
+    "status": "api_failed",
+    "body_prefix": "<html>\r\n<head><title>403 Forbidden</title></head>\r\n<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a padding to d"
+  },
+  {
+    "instance": "https://inv.thepixora.com",
+    "url": "https://inv.thepixora.com/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 200,
+    "content_type": "text/html",
+    "bytes": 2920,
+    "status": "api_failed",
+    "body_prefix": "<!DOCTYPE html><html lang=\"en\"><head><title>Select instance - Invidious</title><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><link rel=\"stylesheet\" type=\"text/css\" href=\"/static/css/main.css?static=bd312d0b07\"><script src=\"/static/js/main.min.js?static=e3687696e1\" text=\"text/javascript\" defer></script></head><body><noscript><style>.requires-scripts {\n\tdisplay: none;\n}\n</style></noscript><header class=\"banner\"><div class=\"logo\"></div><h1>Invidious</h1><"
+  },
+  {
+    "instance": "https://inv1.nadeko.net",
+    "url": "https://inv1.nadeko.net/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 403,
+    "content_type": "text/plain",
+    "bytes": 17,
+    "status": "api_failed",
+    "body_prefix": "Endpoint disabled"
+  },
+  {
+    "instance": "https://inv2.nadeko.net",
+    "url": "https://inv2.nadeko.net/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 403,
+    "content_type": "text/plain",
+    "bytes": 17,
+    "status": "api_failed",
+    "body_prefix": "Endpoint disabled"
+  },
+  {
+    "instance": "https://inv3.nadeko.net",
+    "url": "https://inv3.nadeko.net/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 403,
+    "content_type": "text/plain",
+    "bytes": 17,
+    "status": "api_failed",
+    "body_prefix": "Endpoint disabled"
+  },
+  {
+    "instance": "https://inv4.nadeko.net",
+    "url": "https://inv4.nadeko.net/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 403,
+    "content_type": "text/plain",
+    "bytes": 17,
+    "status": "api_failed",
+    "body_prefix": "Endpoint disabled"
+  },
+  {
+    "instance": "https://inv5.nadeko.net",
+    "url": "https://inv5.nadeko.net/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 403,
+    "content_type": "text/plain",
+    "bytes": 17,
+    "status": "api_failed",
+    "body_prefix": "Endpoint disabled"
+  },
+  {
+    "instance": "https://invidious.adminforge.de",
+    "url": "https://invidious.adminforge.de/api/v1/videos/7UXprjqSBvk?local=true",
+    "status": "exception",
+    "error": "ConnectionError(MaxRetryError('HTTPSConnectionPool(host=\\'adminforge.deapi\\', port=443): Max retries exceeded with url: /v1/videos/7UXprjqSBvk?local=true (Caused by NameResolutionError(\"HTTPSConnection(host=\\'adminforge.deapi\\', port=443): Failed to resolve \\'adminforge.deapi\\' ([Errno -2] Name or service not known)\"))'))"
+  },
+  {
+    "instance": "https://invidious.private.coffee",
+    "url": "https://invidious.private.coffee/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 502,
+    "content_type": null,
+    "bytes": 0,
+    "status": "api_failed",
+    "body_prefix": ""
+  },
+  {
+    "instance": "https://invidious.privacyredirect.com",
+    "url": "https://invidious.privacyredirect.com/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 404,
+    "content_type": "text/html",
+    "bytes": 325,
+    "status": "api_failed",
+    "body_prefix": "<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <link rel=\"stylesheet\" href=\"error.css\">\n    <title>Error</title>\n</head>\n<body>\n    <div class=\"message\">\n        <h1>Oops! Something went wrong.</h1>\n    </div>\n</body>\n</html>\n"
+  },
+  {
+    "instance": "https://inv.us.projectsegfau.lt",
+    "url": "https://inv.us.projectsegfau.lt/api/v1/videos/7UXprjqSBvk?local=true",
+    "status": "exception",
+    "error": "ConnectionError(MaxRetryError('HTTPSConnectionPool(host=\\'inv.us.projectsegfau.lt\\', port=443): Max retries exceeded with url: /api/v1/videos/7UXprjqSBvk?local=true (Caused by NewConnectionError(\"HTTPSConnection(host=\\'inv.us.projectsegfau.lt\\', port=443): Failed to establish a new connection: [Errno 101] Network is unreachable\"))'))"
+  },
+  {
+    "instance": "https://inv.bp.projectsegfau.lt",
+    "url": "https://inv.bp.projectsegfau.lt/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 200,
+    "content_type": "text/plain; charset=utf-8",
+    "bytes": 22,
+    "status": "api_failed",
+    "body_prefix": "Invidious has shutdown"
+  },
+  {
+    "instance": "https://invidious.projectsegfau.lt",
+    "url": "https://invidious.projectsegfau.lt/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 200,
+    "content_type": "text/plain; charset=utf-8",
+    "bytes": 22,
+    "status": "api_failed",
+    "body_prefix": "Invidious has shutdown"
+  },
+  {
+    "instance": "https://invidious.drgns.space",
+    "url": "https://invidious.drgns.space/api/v1/videos/7UXprjqSBvk?local=true",
+    "status": "exception",
+    "error": "ConnectTimeout(MaxRetryError(\"HTTPSConnectionPool(host='invidious.drgns.space', port=443): Max retries exceeded with url: /api/v1/videos/7UXprjqSBvk?local=true (Caused by ConnectTimeoutError(<HTTPSConnection(host='invidious.drgns.space', port=443) at 0x7f0bd384d4c0>, 'Connection to invidious.drgns.space timed out. (connect timeout=24)'))\"))"
+  },
+  {
+    "instance": "https://invidious.einfachzocken.eu",
+    "url": "https://invidious.einfachzocken.eu/api/v1/videos/7UXprjqSBvk?local=true",
+    "status": "exception",
+    "error": "SSLError(MaxRetryError(\"HTTPSConnectionPool(host='invidious.einfachzocken.eu', port=443): Max retries exceeded with url: /api/v1/videos/7UXprjqSBvk?local=true (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate (_ssl.c:1010)')))\"))"
+  },
+  {
+    "instance": "https://invidious.jing.rocks",
+    "url": "https://invidious.jing.rocks/api/v1/videos/7UXprjqSBvk?local=true",
+    "status": "exception",
+    "error": "ConnectionError(MaxRetryError('HTTPSConnectionPool(host=\\'invidious.jing.rocks\\', port=443): Max retries exceeded with url: /api/v1/videos/7UXprjqSBvk?local=true (Caused by NameResolutionError(\"HTTPSConnection(host=\\'invidious.jing.rocks\\', port=443): Failed to resolve \\'invidious.jing.rocks\\' ([Errno -2] Name or service not known)\"))'))"
+  },
+  {
+    "instance": "https://invidious.0011.lt",
+    "url": "https://invidious.0011.lt/api/v1/videos/7UXprjqSBvk?local=true",
+    "status": "exception",
+    "error": "ConnectionError(MaxRetryError('HTTPSConnectionPool(host=\\'invidious.0011.lt\\', port=443): Max retries exceeded with url: /api/v1/videos/7UXprjqSBvk?local=true (Caused by NameResolutionError(\"HTTPSConnection(host=\\'invidious.0011.lt\\', port=443): Failed to resolve \\'invidious.0011.lt\\' ([Errno -2] Name or service not known)\"))'))"
+  },
+  {
+    "instance": "https://iv.ggtyler.dev",
+    "url": "https://iv.ggtyler.dev/api/v1/videos/7UXprjqSBvk?local=true",
+    "status": "exception",
+    "error": "ConnectTimeout(MaxRetryError(\"HTTPSConnectionPool(host='iv.ggtyler.dev', port=443): Max retries exceeded with url: /api/v1/videos/7UXprjqSBvk?local=true (Caused by ConnectTimeoutError(<HTTPSConnection(host='iv.ggtyler.dev', port=443) at 0x7f0bd384dd90>, 'Connection to iv.ggtyler.dev timed out. (connect timeout=24)'))\"))"
+  },
+  {
+    "instance": "https://nyc1.iv.ggtyler.dev",
+    "url": "https://nyc1.iv.ggtyler.dev/api/v1/videos/7UXprjqSBvk?local=true",
+    "status": "exception",
+    "error": "ConnectTimeout(MaxRetryError(\"HTTPSConnectionPool(host='nyc1.iv.ggtyler.dev', port=443): Max retries exceeded with url: /api/v1/videos/7UXprjqSBvk?local=true (Caused by ConnectTimeoutError(<HTTPSConnection(host='nyc1.iv.ggtyler.dev', port=443) at 0x7f0bd384ee40>, 'Connection to nyc1.iv.ggtyler.dev timed out. (connect timeout=24)'))\"))"
+  },
+  {
+    "instance": "https://cal1.iv.ggtyler.dev",
+    "url": "https://cal1.iv.ggtyler.dev/api/v1/videos/7UXprjqSBvk?local=true",
+    "status": "exception",
+    "error": "ConnectTimeout(MaxRetryError(\"HTTPSConnectionPool(host='cal1.iv.ggtyler.dev', port=443): Max retries exceeded with url: /api/v1/videos/7UXprjqSBvk?local=true (Caused by ConnectTimeoutError(<HTTPSConnection(host='cal1.iv.ggtyler.dev', port=443) at 0x7f0bd383f8c0>, 'Connection to cal1.iv.ggtyler.dev timed out. (connect timeout=24)'))\"))"
+  },
+  {
+    "instance": "https://invidious.lunar.icu",
+    "url": "https://invidious.lunar.icu/api/v1/videos/7UXprjqSBvk?local=true",
+    "status": "exception",
+    "error": "ConnectTimeout(MaxRetryError(\"HTTPSConnectionPool(host='invidious.lunar.icu', port=443): Max retries exceeded with url: /api/v1/videos/7UXprjqSBvk?local=true (Caused by ConnectTimeoutError(<HTTPSConnection(host='invidious.lunar.icu', port=443) at 0x7f0bd384e420>, 'Connection to invidious.lunar.icu timed out. (connect timeout=24)'))\"))"
+  },
+  {
+    "instance": "https://iv.duti.dev",
+    "url": "https://iv.duti.dev/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 403,
+    "content_type": "text/plain",
+    "bytes": 100,
+    "status": "api_failed",
+    "body_prefix": "access blocked: blocked by administrative rule adf20c216cd70173c8605f16446fcc7b/5afde5af28c6afacafd1"
+  },
+  {
+    "instance": "https://invid-api.poketube.fun",
+    "url": "https://invid-api.poketube.fun/api/v1/videos/7UXprjqSBvk?local=true",
+    "http_status": 404,
+    "content_type": "text/html",
+    "bytes": 564,
+    "status": "api_failed",
+    "body_prefix": "<html>\r\n<head><title>404 Not Found</title></head>\r\n<body>\r\n<center><h1>404 Not Found</h1></center>\r\n<hr><center>nginx/1.24.0 (Ubuntu)</center>\r\n</body>\r\n</html>\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-- a padding to disable MSIE and Chrome friendly error page -->\r\n<!-"
+  }
+]
