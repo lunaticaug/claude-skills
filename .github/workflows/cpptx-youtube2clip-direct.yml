@@ -1,0 +1,165 @@
+name: Download the actual 23:00 YouTube clip through youtube2clip
+
+on:
+  push:
+    branches:
+      - tmp/cpptx-youtube2clip-api-20260804
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/cpptx-youtube2clip-direct.yml
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install image tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install pillow
+          ffmpeg -version | head -n 3
+      - name: Call the site's exact public clip endpoint used by its own web application
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p artifact/frames
+          URL='https://youtube2clip.com/api/clip'
+          OUT='artifact/youtube-7UXprjqSBvk-23m00s-24m00s.mp4'
+          BODY='artifact/response-body.bin'
+          HEADERS='artifact/response-headers.txt'
+          LOG='artifact/request.log'
+
+          set +e
+          HTTP_CODE=$(curl \
+            --location \
+            --silent \
+            --show-error \
+            --max-time 1200 \
+            --connect-timeout 60 \
+            --retry 2 \
+            --retry-delay 3 \
+            --user-agent 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/150 Safari/537.36' \
+            --referer 'https://youtube2clip.com/' \
+            --header 'Origin: https://youtube2clip.com' \
+            --form 'video_id=7UXprjqSBvk' \
+            --form 'start_time=1380' \
+            --form 'end_time=1440' \
+            --form 'capture_type=mp4' \
+            --dump-header "$HEADERS" \
+            --output "$BODY" \
+            --write-out '%{http_code}' \
+            "$URL" 2> "$LOG")
+          CURL_CODE=$?
+          set -e
+
+          echo "$HTTP_CODE" > artifact/http-status.txt
+          echo "$CURL_CODE" > artifact/curl-exit-code.txt
+          file "$BODY" > artifact/response-file-type.txt || true
+          wc -c "$BODY" > artifact/response-size.txt || true
+
+          CONTENT_TYPE=$(awk 'BEGIN{IGNORECASE=1} /^content-type:/{gsub("\r",""); print $2}' "$HEADERS" | tail -n 1 || true)
+          echo "$CONTENT_TYPE" > artifact/content-type.txt
+
+          if [[ "$HTTP_CODE" == "200" ]] && [[ -s "$BODY" ]] && { [[ "$CONTENT_TYPE" == video/* ]] || ffprobe -v error "$BODY" >/dev/null 2>&1; }; then
+            mv "$BODY" "$OUT"
+            ffprobe -v error -show_format -show_streams -of json "$OUT" > artifact/ffprobe.json
+            ffmpeg -y -i "$OUT" -vf 'fps=1/3,scale=1280:-2' -q:v 2 artifact/frames/frame-%03d.jpg > artifact/ffmpeg.log 2>&1
+          else
+            python - <<'PY'
+          from pathlib import Path
+          body = Path('artifact/response-body.bin')
+          if body.exists():
+              data = body.read_bytes()[:20000]
+              try:
+                  text = data.decode('utf-8', errors='replace')
+              except Exception:
+                  text = repr(data)
+              Path('artifact/response-body-preview.txt').write_text(text, encoding='utf-8')
+          PY
+          fi
+
+          python - <<'PY'
+          import hashlib
+          import json
+          import math
+          from pathlib import Path
+          from PIL import Image, ImageDraw, ImageStat
+
+          root = Path('artifact')
+          video = root / 'youtube-7UXprjqSBvk-23m00s-24m00s.mp4'
+          frames = sorted((root / 'frames').glob('*.jpg'))
+          records = []
+          for index, path in enumerate(frames, 1):
+              image = Image.open(path).convert('RGB')
+              stat = ImageStat.Stat(image)
+              source_second = 1380 + (index - 1) * 3
+              records.append({
+                  'file': path.name,
+                  'source_second': source_second,
+                  'source_timestamp': f'{source_second // 3600:02d}:{(source_second % 3600) // 60:02d}:{source_second % 60:02d}',
+                  'bytes': path.stat().st_size,
+                  'sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+                  'width': image.width,
+                  'height': image.height,
+                  'mean_rgb': [round(v, 2) for v in stat.mean],
+                  'stddev_rgb': [round(v, 2) for v in stat.stddev],
+              })
+          hashes = {record['sha256'] for record in records}
+          result = {
+              'status': 'actual_video_clip_captured' if video.exists() and video.stat().st_size > 100000 and len(records) >= 4 and len(hashes) >= 2 else 'failed',
+              'video_id': '7UXprjqSBvk',
+              'source_start_seconds': 1380,
+              'source_end_seconds': 1440,
+              'video_file': video.name if video.exists() else None,
+              'video_bytes': video.stat().st_size if video.exists() else 0,
+              'frame_count': len(records),
+              'unique_frame_hashes': len(hashes),
+              'frames': records,
+          }
+          (root / 'result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+          if frames:
+              cols = 2
+              thumb_w, thumb_h = 640, 360
+              rows = math.ceil(len(frames) / cols)
+              sheet = Image.new('RGB', (cols * thumb_w, rows * thumb_h), 'white')
+              draw = ImageDraw.Draw(sheet)
+              for index, path in enumerate(frames):
+                  image = Image.open(path).convert('RGB')
+                  image.thumbnail((thumb_w, thumb_h), Image.Resampling.LANCZOS)
+                  canvas = Image.new('RGB', (thumb_w, thumb_h), 'black')
+                  canvas.paste(image, ((thumb_w - image.width) // 2, (thumb_h - image.height) // 2))
+                  x, y = (index % cols) * thumb_w, (index // cols) * thumb_h
+                  sheet.paste(canvas, (x, y))
+                  label = records[index]['source_timestamp']
+                  draw.rectangle((x + 7, y + 7, x + 145, y + 35), fill='black')
+                  draw.text((x + 13, y + 13), label, fill='white')
+              sheet.save(root / 'contact-sheet.jpg', 'JPEG', quality=90, optimize=True)
+          PY
+
+          cat artifact/result.json
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root = Path('artifact')
+          with zipfile.ZipFile(root / 'youtube-7UXprjqSBvk-23m-direct-output.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+              for path in sorted(root.rglob('*')):
+                  if path.is_file() and path.name != 'youtube-7UXprjqSBvk-23m-direct-output.zip':
+                      archive.write(path, path.relative_to(root))
+          PY
+      - name: Upload actual clip and frames
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-7UXprjqSBvk-23m-direct-output
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 2

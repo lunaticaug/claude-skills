@@ -1,0 +1,163 @@
+name: Inspect youtube2clip application bundle
+
+on:
+  push:
+    branches:
+      - tmp/cpptx-youtube2clip-api-20260804
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/cpptx-youtube2clip-api.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install requests beautifulsoup4
+      - name: Download the live application bundle and extract backend contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact/assets
+          cat > artifact/probe_app.py <<'PY'
+          import json
+          import re
+          from pathlib import Path
+          from urllib.parse import urljoin, urlparse
+
+          import requests
+          from bs4 import BeautifulSoup
+
+          root = Path('artifact')
+          assets_dir = root / 'assets'
+          base = 'https://youtube2clip.com/'
+          session = requests.Session()
+          session.headers.update({
+              'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/150 Safari/537.36',
+              'Accept-Language': 'en-US,en;q=0.9',
+          })
+
+          landing = session.get(base, timeout=60)
+          landing.raise_for_status()
+          html = landing.text
+          (root / 'index.html').write_text(html, encoding='utf-8')
+
+          queue = []
+          soup = BeautifulSoup(html, 'html.parser')
+          for tag in soup.find_all(['script', 'link']):
+              raw = tag.get('src') or tag.get('href')
+              if raw and ('/assets/' in raw or raw.endswith('.js')):
+                  url = urljoin(base, raw)
+                  if url not in queue:
+                      queue.append(url)
+
+          downloaded = {}
+          discovery_pattern = re.compile(r'''["'`](?P<path>(?:https?://youtube2clip\.com)?/assets/[^"'`\s]+?\.js)["'`]''')
+          index = 0
+          while index < len(queue) and index < 150:
+              url = queue[index]
+              index += 1
+              if url in downloaded:
+                  continue
+              entry = {'url': url}
+              try:
+                  response = session.get(url, timeout=60)
+                  entry.update({
+                      'http_status': response.status_code,
+                      'content_type': response.headers.get('content-type'),
+                      'bytes': len(response.content),
+                  })
+                  if response.status_code == 200:
+                      name = Path(urlparse(url).path).name or f'asset-{index:03d}.js'
+                      path = assets_dir / name
+                      path.write_bytes(response.content)
+                      entry['file'] = name
+                      text = response.text
+                      for match in discovery_pattern.finditer(text):
+                          child = urljoin(base, match.group('path'))
+                          if child not in queue and child not in downloaded:
+                              queue.append(child)
+              except Exception as exc:
+                  entry['error'] = repr(exc)
+              downloaded[url] = entry
+
+          all_text_parts = [html]
+          for entry in downloaded.values():
+              if entry.get('file'):
+                  try:
+                      all_text_parts.append((assets_dir / entry['file']).read_text(encoding='utf-8', errors='replace'))
+                  except Exception:
+                      pass
+          all_text = '\n'.join(all_text_parts)
+
+          tokens = [
+              'fetch(', 'axios', 'XMLHttpRequest', 'Download Clip', 'start_time', 'end_time',
+              'video_id', 'capture_type', 'FormData', '/api/', 'youtube2clip', 'download',
+              'clip', 'convert', 'process', 'youtube', 'mp4', 'mp3', 'action=',
+          ]
+          windows = []
+          seen = set()
+          for token in tokens:
+              for match in re.finditer(re.escape(token), all_text, re.I):
+                  lo = max(0, match.start() - 1800)
+                  hi = min(len(all_text), match.end() + 3200)
+                  window = all_text[lo:hi]
+                  digest = hash(window)
+                  if digest in seen:
+                      continue
+                  seen.add(digest)
+                  windows.append({'token': token, 'window': window})
+                  if len(windows) >= 450:
+                      break
+              if len(windows) >= 450:
+                  break
+
+          endpoint_patterns = [
+              re.compile(r'''https?://[^"'`\\\s<>]{4,400}''', re.I),
+              re.compile(r'''["'`](/[^"'`\s]{0,200}(?:api|search|clip|download|convert|process|video|youtube)[^"'`\s]{0,200})["'`]''', re.I),
+          ]
+          endpoints = []
+          for pattern in endpoint_patterns:
+              for match in pattern.finditer(all_text):
+                  value = match.group(1) if match.lastindex else match.group(0)
+                  value = value.replace('\\u0026', '&').replace('\\/', '/')
+                  if value not in endpoints:
+                      endpoints.append(value)
+
+          report = {
+              'base': base,
+              'landing_http_status': landing.status_code,
+              'asset_count': len(downloaded),
+              'assets': list(downloaded.values()),
+              'endpoint_candidates': endpoints[:1500],
+              'window_count': len(windows),
+          }
+          (root / 'bundle-report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
+          (root / 'endpoint-candidates.txt').write_text('\n'.join(endpoints[:5000]), encoding='utf-8')
+          (root / 'code-windows.txt').write_text(
+              '\n\n===== TOKEN: ' + '\n\n===== TOKEN: '.join(f"{item['token']} =====\n{item['window']}" for item in windows),
+              encoding='utf-8',
+          )
+          PY
+          python artifact/probe_app.py
+          cat artifact/bundle-report.json
+      - name: Upload bundle inspection
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpptx-youtube2clip-api-output-v2
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 2
