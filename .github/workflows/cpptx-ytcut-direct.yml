@@ -1,0 +1,138 @@
+name: Capture actual YouTube seminar clip with YTCut Direct Browser mode
+
+on:
+  push:
+    branches:
+      - tmp/cpptx-ytcut-direct-20260804
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/cpptx-ytcut-direct.yml
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser and media tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright pillow
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb
+          google-chrome --version
+      - name: Use normal Direct Browser clipping for 23:00-23:10
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact/downloads artifact/frames artifact/evidence artifact/profile
+          cat > artifact/capture.py <<'PY'
+          import hashlib
+          import json
+          import math
+          import re
+          import time
+          from pathlib import Path
+          from PIL import Image, ImageDraw, ImageStat
+          from playwright.sync_api import sync_playwright
+
+          root=Path('artifact');downloads=root/'downloads';frames=root/'frames';evidence=root/'evidence';events=[];download_log=[]
+          source='https://www.youtube.com/watch?v=7UXprjqSBvk'
+          def snapshot(page,label):
+              try:
+                  state=page.evaluate("""()=>({url:location.href,title:document.title,body:(document.body?.innerText||'').slice(0,18000),inputs:[...document.querySelectorAll('input')].map((e,i)=>({i,type:e.type,placeholder:e.placeholder,value:e.value,visible:!!(e.offsetWidth||e.offsetHeight||e.getClientRects().length)})),buttons:[...document.querySelectorAll('button,a,[role=button]')].map((e,i)=>({i,text:(e.innerText||e.getAttribute('aria-label')||'').trim().slice(0,300),disabled:!!e.disabled,visible:!!(e.offsetWidth||e.offsetHeight||e.getClientRects().length)})).filter(x=>x.visible).slice(0,250)})""")
+                  (evidence/f'{label}.json').write_text(json.dumps(state,ensure_ascii=False,indent=2),encoding='utf-8');page.screenshot(path=str(evidence/f'{label}.png'))
+              except Exception as exc:(evidence/f'{label}-error.txt').write_text(repr(exc),encoding='utf-8')
+          with sync_playwright() as p:
+              context=p.chromium.launch_persistent_context(str(root/'profile'),executable_path='/usr/bin/google-chrome',headless=False,viewport={'width':1440,'height':1000},locale='en-US',timezone_id='Asia/Seoul',accept_downloads=True,ignore_default_args=['--enable-automation'],args=['--disable-blink-features=AutomationControlled','--disable-dev-shm-usage','--no-first-run','--no-default-browser-check','--window-size=1440,1000'])
+              context.add_init_script("Object.defineProperty(navigator,'webdriver',{get:()=>undefined});")
+              page=context.pages[0] if context.pages else context.new_page();page.on('console',lambda m:events.append({'type':f'console:{m.type}','text':m.text[:3000]}));page.on('requestfailed',lambda r:events.append({'type':'requestfailed','text':f'{r.url.split("?")[0]} :: {r.failure}'[:3000]}))
+              def on_download(d):
+                  try:path=downloads/(d.suggested_filename or f'download-{len(download_log)+1}.bin');d.save_as(str(path));download_log.append({'file':path.name,'bytes':path.stat().st_size})
+                  except Exception as exc:download_log.append({'error':repr(exc)})
+              page.on('download',on_download)
+              page.goto('https://ytcut.org/',wait_until='domcontentloaded',timeout=90000);page.wait_for_timeout(6000);snapshot(page,'01-landing')
+              box=page.get_by_role('textbox',name=re.compile(r'YouTube URL|video ID|paste',re.I)).first
+              if not box.is_visible(timeout=5000):box=page.locator("input[type=url],input[type=text]").first
+              box.fill(source)
+              try:page.get_by_role('button',name=re.compile(r'load video',re.I)).click(timeout=5000)
+              except Exception:box.press('Enter')
+              deadline=time.time()+180
+              while time.time()<deadline:
+                  body=page.locator('body').inner_text(timeout=5000)
+                  if '지속가능성 공시 의무화 시대' in body and 'Cut & download' in body:break
+                  page.wait_for_timeout(2000)
+              snapshot(page,'02-loaded')
+              fields=page.locator("input[placeholder*='HH:MM:SS'],input[placeholder*='MM:SS']");visible=[]
+              for i in range(fields.count()):
+                  loc=fields.nth(i)
+                  try:
+                      if loc.is_visible(timeout=300):visible.append(loc)
+                  except Exception:pass
+              if len(visible)<2:raise RuntimeError(f'time fields not found: {len(visible)}')
+              visible[0].fill('00:23:00.000');visible[0].press('Tab');visible[1].fill('00:23:10.000');visible[1].press('Tab')
+              direct=page.get_by_text(re.compile(r'^Direct \(Browser\)$',re.I)).first
+              if direct.is_visible(timeout=3000):direct.click(timeout=5000)
+              else:raise RuntimeError('Direct Browser option not visible')
+              snapshot(page,'03-direct-selected')
+              button=page.get_by_text(re.compile(r'^Cut\s*&?\s*download$',re.I)).first
+              if not button.is_visible(timeout=3000):button=page.get_by_role('button',name=re.compile(r'cut.*download',re.I)).first
+              button.click(timeout=8000);snapshot(page,'04-submitted')
+              deadline=time.time()+720;last=0
+              while time.time()<deadline and not download_log:
+                  body=page.locator('body').inner_text(timeout=5000)
+                  if any(x in body.lower() for x in ['download again','clip complete','your download should have started','ready']):
+                      for pat in [r'download again',r'^download$',r'download clip']:
+                          try:
+                              action=page.get_by_text(re.compile(pat,re.I)).first
+                              if action.is_visible(timeout=500):action.click(timeout=5000);page.wait_for_timeout(2500)
+                          except Exception:pass
+                  if time.time()-last>45:snapshot(page,f'05-progress-{int(time.time())}');last=time.time()
+                  page.wait_for_timeout(2500)
+              snapshot(page,'06-final');context.close()
+          (root/'download-log.json').write_text(json.dumps(download_log,ensure_ascii=False,indent=2),encoding='utf-8');(root/'events.json').write_text(json.dumps(events[-2000:],ensure_ascii=False,indent=2),encoding='utf-8')
+          PY
+          xvfb-run -a -s '-screen 0 1440x1000x24' python artifact/capture.py > artifact/browser.log 2>&1 || true
+          rm -rf artifact/profile
+          python - <<'PY'
+          import hashlib,json,math,subprocess,shutil
+          from pathlib import Path
+          from PIL import Image,ImageDraw,ImageStat
+          root=Path('artifact');out=root/'youtube-7UXprjqSBvk-23m00s-23m10s.mp4';attempts=[]
+          for path in (root/'downloads').glob('*'):
+              if path.is_file() and path.stat().st_size>100000:
+                  probe=subprocess.run(['ffprobe','-v','error','-show_entries','stream=codec_type','-of','json',str(path)],text=True,capture_output=True);attempts.append({'file':path.name,'bytes':path.stat().st_size,'probe':probe.returncode})
+                  if probe.returncode==0 and 'video' in probe.stdout:
+                      done=subprocess.run(['ffmpeg','-y','-i',str(path),'-c:v','libx264','-preset','veryfast','-crf','20','-c:a','aac','-b:a','128k','-movflags','+faststart',str(out)],text=True,capture_output=True);attempts[-1]['transcode']=done.returncode
+                      if done.returncode==0 and out.exists():break
+          (root/'collection.json').write_text(json.dumps(attempts,indent=2),encoding='utf-8')
+          if out.exists():
+              subprocess.run(['ffprobe','-v','error','-show_format','-show_streams','-of','json',str(out)],stdout=(root/'ffprobe.json').open('w'),check=False)
+              subprocess.run(['ffmpeg','-y','-i',str(out),'-vf','fps=2,scale=1280:-2','-q:v','2',str(root/'frames'/'frame-%03d.jpg')],stdout=(root/'ffmpeg.log').open('w'),stderr=subprocess.STDOUT,check=False)
+          paths=sorted((root/'frames').glob('*.jpg'));items=[]
+          for i,p in enumerate(paths):
+              im=Image.open(p).convert('RGB');st=ImageStat.Stat(im);sec=1380+i/2;items.append({'file':p.name,'source_second':sec,'source_timestamp':f'{int(sec)//3600:02d}:{(int(sec)%3600)//60:02d}:{int(sec)%60:02d}.{int((sec%1)*10)}','bytes':p.stat().st_size,'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'width':im.width,'height':im.height,'mean_rgb':[round(x,2) for x in st.mean],'stddev_rgb':[round(x,2) for x in st.stddev]})
+          hashes={x['sha256'] for x in items};result={'status':'actual_video_clip_captured' if out.exists() and out.stat().st_size>100000 and len(items)>=4 and len(hashes)>=2 else 'failed','video_id':'7UXprjqSBvk','source_start_seconds':1380,'source_end_seconds':1390,'video_file':out.name if out.exists() else None,'video_bytes':out.stat().st_size if out.exists() else 0,'frame_count':len(items),'unique_frame_hashes':len(hashes),'frames':items};(root/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+          if items:
+              cols=4;w,h=320,180;sheet=Image.new('RGB',(cols*w,math.ceil(len(items)/cols)*h),'white');draw=ImageDraw.Draw(sheet)
+              for i,item in enumerate(items):
+                  im=Image.open(root/'frames'/item['file']).convert('RGB');im.thumbnail((w,h));canvas=Image.new('RGB',(w,h),'black');canvas.paste(im,((w-im.width)//2,(h-im.height)//2));x=(i%cols)*w;y=(i//cols)*h;sheet.paste(canvas,(x,y));draw.text((x+6,y+6),item['source_timestamp'],fill='white',stroke_width=2,stroke_fill='black')
+              sheet.save(root/'contact-sheet.jpg','JPEG',quality=90,optimize=True)
+          PY
+          cat artifact/result.json
+      - name: Upload Direct Browser output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpptx-ytcut-direct-output
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 2
