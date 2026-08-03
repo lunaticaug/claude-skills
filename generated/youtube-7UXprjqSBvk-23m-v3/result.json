@@ -4,7 +4,7 @@
   "source_start_seconds": 1380,
   "source_end_seconds": 1620,
   "selected_frame_count": 8,
-  "unique_selected_hashes": 1,
+  "unique_selected_hashes": 2,
   "suspicious_text_hits": [
     {
       "source_second": 1380,
@@ -56,7 +56,7 @@
     },
     {
       "source_second": 1560,
-      "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류"
+      "body_text": "동영상 플레이어 구성 오류\n동영상 플레이어 구성 오류\n오류 153\nYouTube에서 동영상 보기\n자세히 알아보기\n오류 153"
     },
     {
       "source_second": 1560,

@@ -289,20 +289,20 @@
     "http_status": 200,
     "path": "generated/youtube-7UXprjqSBvk-23m-v3/frames/candidate-007-h1-01560s.png",
     "title": "YouTube",
-    "body_text": "YouTube에서 동영상 보기\n오류 153\n동영상 플레이어 구성 오류",
-    "bytes": 11805,
-    "sha256": "ecd8c91d8a88bff9a903036f242512d29b7dfb7e77c3b9bf5295ed29d6c0427c",
+    "body_text": "동영상 플레이어 구성 오류\n동영상 플레이어 구성 오류\n오류 153\nYouTube에서 동영상 보기\n자세히 알아보기\n오류 153",
+    "bytes": 177229,
+    "sha256": "0e521befccf334eee0c1fcd3b28237d13ef9b533644881666c062f21e9ae5b0f",
     "mean_rgb": [
-      40.98,
-      40.98,
-      40.98
+      22.65,
+      16.69,
+      23.96
     ],
     "stddev_rgb": [
-      11.91,
-      11.9,
-      11.89
+      24.21,
+      21.2,
+      22.95
     ],
-    "visual_score": 36.884,
+    "visual_score": 86.082,
     "selected": true
   },
   {
