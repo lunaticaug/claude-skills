@@ -1,0 +1,302 @@
+name: Capture actual YouTube player frames through youtube2clip origin
+
+on:
+  push:
+    branches:
+      - tmp/cpptx-youtube2clip-player-20260804
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/cpptx-youtube2clip-player.yml
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright pillow
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb
+          google-chrome --version
+      - name: Search the supplied video, seek to 23:00, and capture real player frames
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact/frames artifact/profile
+          cat > artifact/capture.py <<'PY'
+          import hashlib
+          import json
+          import math
+          import time
+          from pathlib import Path
+
+          from PIL import Image, ImageDraw, ImageStat
+          from playwright.sync_api import sync_playwright
+
+          root = Path('artifact')
+          frames_dir = root / 'frames'
+          source_url = 'https://www.youtube.com/watch?v=7UXprjqSBvk'
+          targets = list(range(1380, 1741, 15))
+          records = []
+          browser_events = []
+
+          with sync_playwright() as p:
+              context = p.chromium.launch_persistent_context(
+                  str(root / 'profile'),
+                  executable_path='/usr/bin/google-chrome',
+                  headless=False,
+                  viewport={'width': 1366, 'height': 768},
+                  locale='ko-KR',
+                  timezone_id='Asia/Seoul',
+                  ignore_default_args=['--enable-automation'],
+                  args=[
+                      '--autoplay-policy=no-user-gesture-required',
+                      '--disable-blink-features=AutomationControlled',
+                      '--disable-dev-shm-usage',
+                      '--no-first-run',
+                      '--no-default-browser-check',
+                      '--window-size=1366,768',
+                  ],
+              )
+              context.add_init_script("""
+                  Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                  window.__cpptxYtMessages = [];
+                  window.addEventListener('message', (event) => {
+                    try {
+                      if (String(event.origin).includes('youtube.com')) {
+                        const value = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+                        window.__cpptxYtMessages.push({origin:event.origin, value, at:Date.now()});
+                        if (window.__cpptxYtMessages.length > 2000) window.__cpptxYtMessages.shift();
+                      }
+                    } catch (e) {}
+                  });
+              """)
+              page = context.pages[0] if context.pages else context.new_page()
+              page.on('console', lambda message: browser_events.append({'type': f'console:{message.type}', 'text': message.text[:3000]}))
+              page.on('pageerror', lambda exc: browser_events.append({'type': 'pageerror', 'text': str(exc)[:3000]}))
+              page.on('requestfailed', lambda request: browser_events.append({'type': 'requestfailed', 'text': f'{request.url} :: {request.failure}'[:3000]}))
+
+              page.goto('https://youtube2clip.com/', wait_until='domcontentloaded', timeout=90000)
+              page.wait_for_timeout(5000)
+              for label in ['Refuse', 'Accept']:
+                  try:
+                      button = page.get_by_role('button', name=label).first
+                      if button.is_visible(timeout=700):
+                          button.click(timeout=3000)
+                          page.wait_for_timeout(600)
+                          break
+                  except Exception:
+                      pass
+
+              search = page.get_by_role('textbox', name='Search for a YouTube video').first
+              search.fill(source_url)
+              search.press('Enter')
+              iframe = page.locator('iframe#youtube-player-modal').first
+              iframe.wait_for(state='visible', timeout=90000)
+              page.wait_for_timeout(9000)
+
+              # Expand only the actual YouTube player to a clean 16:9 capture surface.
+              page.evaluate("""() => {
+                  const f = document.querySelector('iframe#youtube-player-modal');
+                  if (!f) return;
+                  f.style.position = 'fixed';
+                  f.style.left = '0px';
+                  f.style.top = '0px';
+                  f.style.width = '1280px';
+                  f.style.height = '720px';
+                  f.style.zIndex = '2147483647';
+                  f.style.border = '0';
+                  f.style.background = 'black';
+              }""")
+              page.set_viewport_size({'width': 1280, 'height': 720})
+              page.mouse.move(1275, 5)
+
+              # Register as a listener for the IFrame API protocol and attempt a real user gesture.
+              page.evaluate("""() => {
+                  const f = document.querySelector('iframe#youtube-player-modal');
+                  if (!f || !f.contentWindow) return;
+                  for (const payload of [
+                    {event:'listening', id:1},
+                    {event:'command', func:'mute', args:[], id:1},
+                    {event:'command', func:'playVideo', args:[], id:1}
+                  ]) f.contentWindow.postMessage(JSON.stringify(payload), '*');
+              }""")
+              try:
+                  iframe.click(position={'x': 640, 'y': 360}, timeout=5000)
+              except Exception:
+                  pass
+              page.wait_for_timeout(5000)
+
+              initial = page.evaluate("""() => {
+                  const f = document.querySelector('iframe#youtube-player-modal');
+                  let player = null;
+                  try { player = window.YT && typeof window.YT.get === 'function' ? window.YT.get('youtube-player-modal') : null; } catch (e) {}
+                  let api = null;
+                  try {
+                    if (player) api = {
+                      duration: player.getDuration?.(),
+                      currentTime: player.getCurrentTime?.(),
+                      state: player.getPlayerState?.(),
+                      quality: player.getPlaybackQuality?.(),
+                      loadedFraction: player.getVideoLoadedFraction?.(),
+                    };
+                  } catch (e) { api = {error:String(e)}; }
+                  return {
+                    iframeSrc: f?.src || null,
+                    ytPresent: !!window.YT,
+                    ytGetPresent: !!(window.YT && typeof window.YT.get === 'function'),
+                    playerFromGet: !!player,
+                    api,
+                    recentMessages: (window.__cpptxYtMessages || []).slice(-40),
+                  };
+              }""")
+              (root / 'initial-player-state.json').write_text(json.dumps(initial, ensure_ascii=False, indent=2), encoding='utf-8')
+              iframe.screenshot(path=str(root / 'initial-player.png'), timeout=30000)
+
+              for output_index, second in enumerate(targets, 1):
+                  record = {'output_index': output_index, 'source_second': second, 'source_timestamp': f'{second // 3600:02d}:{(second % 3600) // 60:02d}:{second % 60:02d}'}
+                  try:
+                      state = page.evaluate("""async (second) => {
+                          const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+                          const f = document.querySelector('iframe#youtube-player-modal');
+                          let player = null;
+                          try { player = window.YT && typeof window.YT.get === 'function' ? window.YT.get('youtube-player-modal') : null; } catch (e) {}
+                          const send = (func, args=[]) => {
+                            if (!f || !f.contentWindow) return;
+                            f.contentWindow.postMessage(JSON.stringify({event:'command', func, args, id:1}), '*');
+                          };
+                          let method = 'postMessage';
+                          if (player && typeof player.seekTo === 'function') {
+                            method = 'YT.get';
+                            try { player.mute(); } catch (e) {}
+                            try { player.seekTo(second, true); } catch (e) {}
+                            try { player.playVideo(); } catch (e) {}
+                          } else {
+                            send('mute');
+                            send('seekTo', [second, true]);
+                            send('playVideo');
+                          }
+                          await sleep(4200);
+                          let currentTime = null, duration = null, playerState = null, quality = null, loadedFraction = null;
+                          if (player) {
+                            try { currentTime = player.getCurrentTime(); } catch (e) {}
+                            try { duration = player.getDuration(); } catch (e) {}
+                            try { playerState = player.getPlayerState(); } catch (e) {}
+                            try { quality = player.getPlaybackQuality(); } catch (e) {}
+                            try { loadedFraction = player.getVideoLoadedFraction(); } catch (e) {}
+                            try { player.pauseVideo(); } catch (e) {}
+                          } else {
+                            send('pauseVideo');
+                            const messages = (window.__cpptxYtMessages || []).slice(-200).map(x => x.value);
+                            for (let i = messages.length - 1; i >= 0; i--) {
+                              const info = messages[i]?.info;
+                              if (!info) continue;
+                              if (currentTime == null && typeof info.currentTime === 'number') currentTime = info.currentTime;
+                              if (duration == null && typeof info.duration === 'number') duration = info.duration;
+                              if (playerState == null && typeof info.playerState === 'number') playerState = info.playerState;
+                              if (quality == null && info.playbackQuality) quality = info.playbackQuality;
+                              if (currentTime != null && duration != null) break;
+                            }
+                          }
+                          await sleep(1200);
+                          return {
+                            method, requested: second, currentTime, duration, playerState, quality, loadedFraction,
+                            recentMessages: (window.__cpptxYtMessages || []).slice(-80),
+                          };
+                      }""", second)
+                      page.mouse.move(1275, 5)
+                      page.wait_for_timeout(1200)
+                      target = frames_dir / f'frame-{output_index:03d}-{second:05d}s.png'
+                      iframe.screenshot(path=str(target), timeout=30000)
+                      image = Image.open(target).convert('RGB')
+                      stat = ImageStat.Stat(image)
+                      current = state.get('currentTime')
+                      duration = state.get('duration')
+                      valid_time = isinstance(current, (int, float)) and abs(current - second) <= 20
+                      valid_duration = isinstance(duration, (int, float)) and duration > 9000
+                      record.update({
+                          'status': 'captured' if valid_time and valid_duration else 'unverified_frame',
+                          'player_state': {k: v for k, v in state.items() if k != 'recentMessages'},
+                          'file': target.name,
+                          'bytes': target.stat().st_size,
+                          'sha256': hashlib.sha256(target.read_bytes()).hexdigest(),
+                          'width': image.width,
+                          'height': image.height,
+                          'mean_rgb': [round(value, 2) for value in stat.mean],
+                          'stddev_rgb': [round(value, 2) for value in stat.stddev],
+                      })
+                  except Exception as exc:
+                      record.update({'status': 'failed', 'error': repr(exc)})
+                  records.append(record)
+
+              final_messages = page.evaluate("() => (window.__cpptxYtMessages || []).slice(-500)")
+              context.close()
+
+          (root / 'capture-records.json').write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding='utf-8')
+          (root / 'player-messages.json').write_text(json.dumps(final_messages, ensure_ascii=False, indent=2), encoding='utf-8')
+          (root / 'browser-events.json').write_text(json.dumps(browser_events[-1000:], ensure_ascii=False, indent=2), encoding='utf-8')
+
+          captured = [item for item in records if item.get('status') == 'captured']
+          all_images = [item for item in records if item.get('file')]
+          unique_hashes = {item['sha256'] for item in captured}
+          sheet_items = captured if captured else all_images
+          if sheet_items:
+              cols, thumb_w, thumb_h = 2, 640, 360
+              rows = math.ceil(len(sheet_items) / cols)
+              sheet = Image.new('RGB', (cols * thumb_w, rows * thumb_h), 'white')
+              draw = ImageDraw.Draw(sheet)
+              for index, item in enumerate(sheet_items):
+                  image = Image.open(frames_dir / item['file']).convert('RGB')
+                  image.thumbnail((thumb_w, thumb_h), Image.Resampling.LANCZOS)
+                  canvas = Image.new('RGB', (thumb_w, thumb_h), 'black')
+                  canvas.paste(image, ((thumb_w - image.width) // 2, (thumb_h - image.height) // 2))
+                  x, y = (index % cols) * thumb_w, (index // cols) * thumb_h
+                  sheet.paste(canvas, (x, y))
+                  draw.rectangle((x + 7, y + 7, x + 150, y + 35), fill='black')
+                  draw.text((x + 13, y + 13), item['source_timestamp'], fill='white')
+              sheet.save(root / 'contact-sheet.jpg', 'JPEG', quality=90, optimize=True)
+
+          result = {
+              'status': 'actual_video_frames_captured' if len(captured) >= 4 and len(unique_hashes) >= 2 else 'failed',
+              'video_id': '7UXprjqSBvk',
+              'source_url': source_url,
+              'source_start_seconds': min(targets),
+              'source_end_seconds': max(targets),
+              'requested_frame_count': len(targets),
+              'verified_frame_count': len(captured),
+              'unique_verified_hashes': len(unique_hashes),
+              'verified_files': [item['file'] for item in captured],
+          }
+          (root / 'result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+          PY
+          xvfb-run -a -s '-screen 0 1366x768x24' python artifact/capture.py > artifact/capture.log 2>&1
+          rm -rf artifact/profile
+          cat artifact/result.json
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root = Path('artifact')
+          with zipfile.ZipFile(root / 'cpptx-youtube2clip-player-output.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+              for path in sorted(root.rglob('*')):
+                  if path.is_file() and path.name != 'cpptx-youtube2clip-player-output.zip':
+                      archive.write(path, path.relative_to(root))
+          PY
+      - name: Upload actual player frames
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpptx-youtube2clip-player-output
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 2
