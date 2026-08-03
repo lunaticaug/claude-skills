@@ -1,0 +1,358 @@
+name: Capture real YouTube frames through community Cobalt
+
+on:
+  push:
+    branches:
+      - tmp/cpptx-youtube-community-cobalt-20260804
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/cpptx-youtube-community-cobalt.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install capture dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install requests pillow
+          ffmpeg -version | head -n 3
+
+      - name: Resolve the supplied YouTube video and capture 23:00-29:00
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT='artifact'
+          mkdir -p "$ROOT/frames"
+
+          cat > "$ROOT/capture.py" <<'PY'
+          import hashlib
+          import io
+          import json
+          import math
+          import os
+          import subprocess
+          import time
+          from pathlib import Path
+
+          import requests
+          from PIL import Image, ImageDraw, ImageStat
+
+          root = Path('artifact')
+          frames_dir = root / 'frames'
+          video_id = '7UXprjqSBvk'
+          source_url = f'https://www.youtube.com/watch?v={video_id}'
+          start_s = 1380
+          end_s = 1740
+
+          endpoints = [
+              'https://grapefruit.clxxped.lol',
+              'https://nuko-c.meowing.de',
+              'https://api-cobalt.eversiege.network',
+              'https://cobalt-api.meowing.de',
+              'https://capi.3kh0.net',
+              'https://lime.clxxped.lol',
+              'https://api.cobalt.liubquanti.click',
+          ]
+
+          session = requests.Session()
+          session.headers.update({
+              'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/150 Safari/537.36',
+              'Accept': 'application/json',
+          })
+
+          attempts = []
+          winner = None
+
+          def sanitized_response(payload):
+              if not isinstance(payload, dict):
+                  return payload
+              clean = dict(payload)
+              if clean.get('url'):
+                  clean['url'] = '<redacted-media-url>'
+              if clean.get('tunnel'):
+                  clean['tunnel'] = ['<redacted-media-url>' for _ in clean.get('tunnel', [])]
+              if clean.get('picker'):
+                  clean['picker'] = [
+                      {k: ('<redacted-media-url>' if k in {'url', 'thumb'} else v) for k, v in item.items()}
+                      for item in clean.get('picker', [])
+                  ]
+              return clean
+
+          def media_candidates(payload):
+              if not isinstance(payload, dict):
+                  return []
+              status = payload.get('status')
+              values = []
+              if status in {'tunnel', 'redirect'} and payload.get('url'):
+                  values.append(payload['url'])
+              elif status == 'local-processing':
+                  values.extend(payload.get('tunnel') or [])
+              elif status == 'picker':
+                  for item in payload.get('picker') or []:
+                      if item.get('type') in {'video', 'gif'} and item.get('url'):
+                          values.append(item['url'])
+              return values
+
+          def run_ffmpeg(media_url, endpoint_label, attempt_index):
+              run_dir = root / f'run-{attempt_index:02d}'
+              run_dir.mkdir(parents=True, exist_ok=True)
+              out_pattern = str(run_dir / 'frame-%03d.jpg')
+              commands = [
+                  [
+                      'ffmpeg', '-hide_banner', '-y', '-loglevel', 'warning',
+                      '-rw_timeout', '120000000', '-ss', str(start_s), '-i', media_url,
+                      '-t', str(end_s - start_s), '-an',
+                      '-vf', "fps=1/15,scale='min(960,iw)':-2",
+                      '-q:v', '3', out_pattern,
+                  ],
+                  [
+                      'ffmpeg', '-hide_banner', '-y', '-loglevel', 'warning',
+                      '-rw_timeout', '120000000', '-i', media_url, '-ss', str(start_s),
+                      '-t', str(end_s - start_s), '-an',
+                      '-vf', "fps=1/15,scale='min(960,iw)':-2",
+                      '-q:v', '3', out_pattern,
+                  ],
+              ]
+              logs = []
+              for command_index, command in enumerate(commands, 1):
+                  for path in run_dir.glob('frame-*.jpg'):
+                      path.unlink()
+                  safe_command = ['<redacted-media-url>' if part == media_url else part for part in command]
+                  started = time.time()
+                  try:
+                      completed = subprocess.run(
+                          command,
+                          text=True,
+                          stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE,
+                          timeout=720,
+                      )
+                      duration = round(time.time() - started, 3)
+                      frame_paths = sorted(run_dir.glob('frame-*.jpg'))
+                      entry = {
+                          'command_index': command_index,
+                          'command': safe_command,
+                          'returncode': completed.returncode,
+                          'duration_seconds': duration,
+                          'frame_count': len(frame_paths),
+                          'stderr_tail': completed.stderr[-12000:].replace(media_url, '<redacted-media-url>'),
+                      }
+                      logs.append(entry)
+                      if completed.returncode == 0 and len(frame_paths) >= 4:
+                          return run_dir, logs
+                  except Exception as exc:
+                      logs.append({
+                          'command_index': command_index,
+                          'command': safe_command,
+                          'error': repr(exc),
+                          'duration_seconds': round(time.time() - started, 3),
+                      })
+              return None, logs
+
+          for endpoint_index, endpoint in enumerate(endpoints, 1):
+              endpoint = endpoint.rstrip('/')
+              attempt = {'endpoint': endpoint, 'endpoint_index': endpoint_index}
+              try:
+                  info = session.get(endpoint + '/', timeout=25)
+                  attempt['info_http_status'] = info.status_code
+                  attempt['info_content_type'] = info.headers.get('content-type')
+                  if info.text:
+                      attempt['info_prefix'] = info.text[:1000]
+              except Exception as exc:
+                  attempt['info_error'] = repr(exc)
+
+              payload_variants = [
+                  {
+                      'url': source_url,
+                      'videoQuality': '480',
+                      'downloadMode': 'mute',
+                      'youtubeVideoCodec': 'h264',
+                      'youtubeVideoContainer': 'mp4',
+                      'localProcessing': 'disabled',
+                      'alwaysProxy': True,
+                      'disableMetadata': True,
+                  },
+                  {
+                      'url': source_url,
+                      'videoQuality': '360',
+                      'downloadMode': 'mute',
+                      'youtubeVideoCodec': 'h264',
+                      'youtubeVideoContainer': 'mp4',
+                      'localProcessing': 'preferred',
+                      'alwaysProxy': True,
+                      'disableMetadata': True,
+                  },
+                  {
+                      'url': source_url,
+                      'videoQuality': '360',
+                      'downloadMode': 'mute',
+                      'youtubeVideoCodec': 'h264',
+                      'youtubeVideoContainer': 'mp4',
+                      'disableMetadata': True,
+                  },
+              ]
+
+              resolved = False
+              for variant_index, request_payload in enumerate(payload_variants, 1):
+                  request_entry = {'variant_index': variant_index, 'request': request_payload}
+                  try:
+                      response = session.post(
+                          endpoint + '/',
+                          headers={
+                              'Accept': 'application/json',
+                              'Content-Type': 'application/json',
+                              'Origin': 'https://cobalt.tools',
+                              'Referer': 'https://cobalt.tools/',
+                          },
+                          json=request_payload,
+                          timeout=150,
+                      )
+                      request_entry['http_status'] = response.status_code
+                      request_entry['content_type'] = response.headers.get('content-type')
+                      request_entry['body_prefix'] = response.text[:2000]
+                      try:
+                          response_payload = response.json()
+                      except Exception:
+                          response_payload = None
+                      request_entry['response'] = sanitized_response(response_payload)
+                      candidates = media_candidates(response_payload)
+                      request_entry['media_candidate_count'] = len(candidates)
+                      if candidates:
+                          resolved = True
+                          for candidate_index, media_url in enumerate(candidates[:3], 1):
+                              run_dir, ffmpeg_logs = run_ffmpeg(
+                                  media_url,
+                                  endpoint,
+                                  endpoint_index * 10 + variant_index * 3 + candidate_index,
+                              )
+                              request_entry.setdefault('ffmpeg_attempts', []).append({
+                                  'candidate_index': candidate_index,
+                                  'logs': ffmpeg_logs,
+                              })
+                              if run_dir:
+                                  winner = {
+                                      'endpoint': endpoint,
+                                      'endpoint_index': endpoint_index,
+                                      'variant_index': variant_index,
+                                      'candidate_index': candidate_index,
+                                      'run_dir': str(run_dir),
+                                  }
+                                  break
+                      if winner:
+                          attempt.setdefault('requests', []).append(request_entry)
+                          break
+                  except Exception as exc:
+                      request_entry['error'] = repr(exc)
+                  attempt.setdefault('requests', []).append(request_entry)
+              attempts.append(attempt)
+              if winner:
+                  break
+
+          (root / 'cobalt-attempts.json').write_text(
+              json.dumps(attempts, ensure_ascii=False, indent=2), encoding='utf-8'
+          )
+
+          selected = []
+          if winner:
+              run_dir = Path(winner['run_dir'])
+              raw_frames = sorted(run_dir.glob('frame-*.jpg'))
+              # Retain no more than 25 evenly spaced real frames for the downstream skill test.
+              if len(raw_frames) <= 25:
+                  keep_indexes = list(range(len(raw_frames)))
+              else:
+                  keep_indexes = sorted({round(i * (len(raw_frames) - 1) / 24) for i in range(25)})
+              for output_index, source_index in enumerate(keep_indexes, 1):
+                  source = raw_frames[source_index]
+                  target = frames_dir / f'frame-{output_index:03d}.jpg'
+                  image = Image.open(source).convert('RGB')
+                  image.save(target, 'JPEG', quality=88, optimize=True)
+                  source_second = start_s + source_index * 15
+                  selected.append({
+                      'file': target.name,
+                      'source_second': source_second,
+                      'source_timestamp': f'{source_second // 3600:02d}:{(source_second % 3600) // 60:02d}:{source_second % 60:02d}',
+                      'bytes': target.stat().st_size,
+                      'sha256': hashlib.sha256(target.read_bytes()).hexdigest(),
+                      'width': image.width,
+                      'height': image.height,
+                      'mean_rgb': [round(v, 2) for v in ImageStat.Stat(image).mean],
+                      'stddev_rgb': [round(v, 2) for v in ImageStat.Stat(image).stddev],
+                  })
+
+          hashes = {item['sha256'] for item in selected}
+          result = {
+              'status': 'actual_video_frames_captured' if len(selected) >= 4 and len(hashes) >= 2 else 'failed',
+              'video_id': video_id,
+              'source_url': source_url,
+              'source_start_seconds': start_s,
+              'source_end_seconds': end_s,
+              'winner': {k: v for k, v in (winner or {}).items() if k != 'run_dir'},
+              'selected_frame_count': len(selected),
+              'unique_selected_hashes': len(hashes),
+              'frames': selected,
+          }
+          (root / 'result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+
+          if selected:
+              cols = 2
+              thumb_w, thumb_h = 640, 360
+              rows = math.ceil(len(selected) / cols)
+              sheet = Image.new('RGB', (cols * thumb_w, rows * thumb_h), 'white')
+              draw = ImageDraw.Draw(sheet)
+              for index, item in enumerate(selected):
+                  path = frames_dir / item['file']
+                  image = Image.open(path).convert('RGB')
+                  image.thumbnail((thumb_w, thumb_h), Image.Resampling.LANCZOS)
+                  canvas = Image.new('RGB', (thumb_w, thumb_h), 'black')
+                  canvas.paste(image, ((thumb_w - image.width) // 2, (thumb_h - image.height) // 2))
+                  x = (index % cols) * thumb_w
+                  y = (index // cols) * thumb_h
+                  sheet.paste(canvas, (x, y))
+                  label = item['source_timestamp']
+                  draw.rectangle((x + 7, y + 7, x + 130, y + 34), fill='black')
+                  draw.text((x + 13, y + 13), label, fill='white')
+              sheet.save(root / 'contact-sheet.jpg', 'JPEG', quality=90, optimize=True)
+
+          # Remove any transient media-resolution directories; only selected real frames remain.
+          for path in root.glob('run-*'):
+              if path.is_dir():
+                  for child in path.iterdir():
+                      child.unlink()
+                  path.rmdir()
+          PY
+
+          python "$ROOT/capture.py"
+          cat "$ROOT/result.json"
+
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root = Path('artifact')
+          with zipfile.ZipFile(root / 'cpptx-youtube-7UXprjqSBvk-23m-real-frames.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
+              for path in sorted(root.rglob('*')):
+                  if path.is_file() and path.name != 'cpptx-youtube-7UXprjqSBvk-23m-real-frames.zip':
+                      archive.write(path, path.relative_to(root))
+          PY
+
+      - name: Upload real-frame artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpptx-youtube-7UXprjqSBvk-23m-real-frames
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 2
