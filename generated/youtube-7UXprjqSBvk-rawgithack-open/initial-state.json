@@ -1,0 +1,29 @@
+{
+  "title": "cpptx YouTube capture probe",
+  "href": "https://raw.githack.com/lunaticaug/claude-skills/82e2251cc0b70621f45e0dc979ddaa2cbadd98df/tools/cpptx-youtube-player.html?start=1380",
+  "state": {
+    "apiReady": true,
+    "ready": true,
+    "error": 150,
+    "state": -1,
+    "initialStart": 1380,
+    "events": [
+      {
+        "type": "ready",
+        "at": 1785778705901
+      },
+      {
+        "type": "state",
+        "value": -1,
+        "at": 1785778706100
+      },
+      {
+        "type": "error",
+        "value": 150,
+        "at": 1785778706102
+      }
+    ]
+  },
+  "iframe": "https://www.youtube.com/embed/7UXprjqSBvk?autoplay=1&mute=1&controls=0&rel=0&playsinline=1&start=1380&origin=https%3A%2F%2Fraw.githack.com&enablejsapi=1&widgetid=1&forigin=https%3A%2F%2Fraw.githack.com%2Flunaticaug%2Fclaude-skills%2F82e2251cc0b70621f45e0dc979ddaa2cbadd98df%2Ftools%2Fcpptx-youtube-player.html%3Fstart%3D1380&aoriginsup=1&gporigin=https%3A%2F%2Fraw.githack.com%2Flunaticaug%2Fclaude-skills%2F82e2251cc0b70621f45e0dc979ddaa2cbadd98df%2Ftools%2Fcpptx-youtube-player.html%3Fstart%3D1380&vf=6",
+  "body": ""
+}

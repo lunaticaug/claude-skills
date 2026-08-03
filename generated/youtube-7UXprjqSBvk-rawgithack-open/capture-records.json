@@ -1,0 +1,418 @@
+[
+  {
+    "source_second": 1380,
+    "status": "player_error_frame",
+    "seek": {
+      "ok": false,
+      "requested": 1380,
+      "currentTime": 1380,
+      "duration": 10175,
+      "playerState": -1,
+      "videoUrl": "https://www.youtube.com/watch?t=1380&v=7UXprjqSBvk",
+      "quality": "unknown",
+      "loadedFraction": 0,
+      "state": {
+        "apiReady": true,
+        "ready": true,
+        "error": 150,
+        "state": -1,
+        "initialStart": 1380,
+        "events": [
+          {
+            "type": "ready",
+            "at": 1785778705901
+          },
+          {
+            "type": "state",
+            "value": -1,
+            "at": 1785778706100
+          },
+          {
+            "type": "error",
+            "value": 150,
+            "at": 1785778706102
+          }
+        ]
+      }
+    },
+    "path": "generated/youtube-7UXprjqSBvk-rawgithack-open/frames/frame-001-01380s.png",
+    "bytes": 12576,
+    "sha256": "6d29313d7c86b9e7a32b5cf0bae9069e796b1837edac3285da8a355647c4bbfb",
+    "width": 1280,
+    "height": 720,
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.84,
+      11.83,
+      11.82
+    ]
+  },
+  {
+    "source_second": 1390,
+    "status": "player_error_frame",
+    "seek": {
+      "ok": false,
+      "requested": 1390,
+      "currentTime": 1380,
+      "duration": 10175,
+      "playerState": -1,
+      "videoUrl": "https://www.youtube.com/watch?t=1380&v=7UXprjqSBvk",
+      "quality": "unknown",
+      "loadedFraction": 0,
+      "state": {
+        "apiReady": true,
+        "ready": true,
+        "error": 150,
+        "state": -1,
+        "initialStart": 1380,
+        "events": [
+          {
+            "type": "ready",
+            "at": 1785778705901
+          },
+          {
+            "type": "state",
+            "value": -1,
+            "at": 1785778706100
+          },
+          {
+            "type": "error",
+            "value": 150,
+            "at": 1785778706102
+          }
+        ]
+      }
+    },
+    "path": "generated/youtube-7UXprjqSBvk-rawgithack-open/frames/frame-002-01390s.png",
+    "bytes": 12576,
+    "sha256": "6d29313d7c86b9e7a32b5cf0bae9069e796b1837edac3285da8a355647c4bbfb",
+    "width": 1280,
+    "height": 720,
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.84,
+      11.83,
+      11.82
+    ]
+  },
+  {
+    "source_second": 1400,
+    "status": "player_error_frame",
+    "seek": {
+      "ok": false,
+      "requested": 1400,
+      "currentTime": 1380,
+      "duration": 10175,
+      "playerState": -1,
+      "videoUrl": "https://www.youtube.com/watch?t=1380&v=7UXprjqSBvk",
+      "quality": "unknown",
+      "loadedFraction": 0,
+      "state": {
+        "apiReady": true,
+        "ready": true,
+        "error": 150,
+        "state": -1,
+        "initialStart": 1380,
+        "events": [
+          {
+            "type": "ready",
+            "at": 1785778705901
+          },
+          {
+            "type": "state",
+            "value": -1,
+            "at": 1785778706100
+          },
+          {
+            "type": "error",
+            "value": 150,
+            "at": 1785778706102
+          }
+        ]
+      }
+    },
+    "path": "generated/youtube-7UXprjqSBvk-rawgithack-open/frames/frame-003-01400s.png",
+    "bytes": 12576,
+    "sha256": "6d29313d7c86b9e7a32b5cf0bae9069e796b1837edac3285da8a355647c4bbfb",
+    "width": 1280,
+    "height": 720,
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.84,
+      11.83,
+      11.82
+    ]
+  },
+  {
+    "source_second": 1415,
+    "status": "player_error_frame",
+    "seek": {
+      "ok": false,
+      "requested": 1415,
+      "currentTime": 1380,
+      "duration": 10175,
+      "playerState": -1,
+      "videoUrl": "https://www.youtube.com/watch?t=1380&v=7UXprjqSBvk",
+      "quality": "unknown",
+      "loadedFraction": 0,
+      "state": {
+        "apiReady": true,
+        "ready": true,
+        "error": 150,
+        "state": -1,
+        "initialStart": 1380,
+        "events": [
+          {
+            "type": "ready",
+            "at": 1785778705901
+          },
+          {
+            "type": "state",
+            "value": -1,
+            "at": 1785778706100
+          },
+          {
+            "type": "error",
+            "value": 150,
+            "at": 1785778706102
+          }
+        ]
+      }
+    },
+    "path": "generated/youtube-7UXprjqSBvk-rawgithack-open/frames/frame-004-01415s.png",
+    "bytes": 12576,
+    "sha256": "6d29313d7c86b9e7a32b5cf0bae9069e796b1837edac3285da8a355647c4bbfb",
+    "width": 1280,
+    "height": 720,
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.84,
+      11.83,
+      11.82
+    ]
+  },
+  {
+    "source_second": 1430,
+    "status": "player_error_frame",
+    "seek": {
+      "ok": false,
+      "requested": 1430,
+      "currentTime": 1380,
+      "duration": 10175,
+      "playerState": -1,
+      "videoUrl": "https://www.youtube.com/watch?t=1380&v=7UXprjqSBvk",
+      "quality": "unknown",
+      "loadedFraction": 0,
+      "state": {
+        "apiReady": true,
+        "ready": true,
+        "error": 150,
+        "state": -1,
+        "initialStart": 1380,
+        "events": [
+          {
+            "type": "ready",
+            "at": 1785778705901
+          },
+          {
+            "type": "state",
+            "value": -1,
+            "at": 1785778706100
+          },
+          {
+            "type": "error",
+            "value": 150,
+            "at": 1785778706102
+          }
+        ]
+      }
+    },
+    "path": "generated/youtube-7UXprjqSBvk-rawgithack-open/frames/frame-005-01430s.png",
+    "bytes": 12576,
+    "sha256": "6d29313d7c86b9e7a32b5cf0bae9069e796b1837edac3285da8a355647c4bbfb",
+    "width": 1280,
+    "height": 720,
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.84,
+      11.83,
+      11.82
+    ]
+  },
+  {
+    "source_second": 1450,
+    "status": "player_error_frame",
+    "seek": {
+      "ok": false,
+      "requested": 1450,
+      "currentTime": 1380,
+      "duration": 10175,
+      "playerState": -1,
+      "videoUrl": "https://www.youtube.com/watch?t=1380&v=7UXprjqSBvk",
+      "quality": "unknown",
+      "loadedFraction": 0,
+      "state": {
+        "apiReady": true,
+        "ready": true,
+        "error": 150,
+        "state": -1,
+        "initialStart": 1380,
+        "events": [
+          {
+            "type": "ready",
+            "at": 1785778705901
+          },
+          {
+            "type": "state",
+            "value": -1,
+            "at": 1785778706100
+          },
+          {
+            "type": "error",
+            "value": 150,
+            "at": 1785778706102
+          }
+        ]
+      }
+    },
+    "path": "generated/youtube-7UXprjqSBvk-rawgithack-open/frames/frame-006-01450s.png",
+    "bytes": 12576,
+    "sha256": "6d29313d7c86b9e7a32b5cf0bae9069e796b1837edac3285da8a355647c4bbfb",
+    "width": 1280,
+    "height": 720,
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.84,
+      11.83,
+      11.82
+    ]
+  },
+  {
+    "source_second": 1470,
+    "status": "player_error_frame",
+    "seek": {
+      "ok": false,
+      "requested": 1470,
+      "currentTime": 1380,
+      "duration": 10175,
+      "playerState": -1,
+      "videoUrl": "https://www.youtube.com/watch?t=1380&v=7UXprjqSBvk",
+      "quality": "unknown",
+      "loadedFraction": 0,
+      "state": {
+        "apiReady": true,
+        "ready": true,
+        "error": 150,
+        "state": -1,
+        "initialStart": 1380,
+        "events": [
+          {
+            "type": "ready",
+            "at": 1785778705901
+          },
+          {
+            "type": "state",
+            "value": -1,
+            "at": 1785778706100
+          },
+          {
+            "type": "error",
+            "value": 150,
+            "at": 1785778706102
+          }
+        ]
+      }
+    },
+    "path": "generated/youtube-7UXprjqSBvk-rawgithack-open/frames/frame-007-01470s.png",
+    "bytes": 12576,
+    "sha256": "6d29313d7c86b9e7a32b5cf0bae9069e796b1837edac3285da8a355647c4bbfb",
+    "width": 1280,
+    "height": 720,
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.84,
+      11.83,
+      11.82
+    ]
+  },
+  {
+    "source_second": 1500,
+    "status": "player_error_frame",
+    "seek": {
+      "ok": false,
+      "requested": 1500,
+      "currentTime": 1380,
+      "duration": 10175,
+      "playerState": -1,
+      "videoUrl": "https://www.youtube.com/watch?t=1380&v=7UXprjqSBvk",
+      "quality": "unknown",
+      "loadedFraction": 0,
+      "state": {
+        "apiReady": true,
+        "ready": true,
+        "error": 150,
+        "state": -1,
+        "initialStart": 1380,
+        "events": [
+          {
+            "type": "ready",
+            "at": 1785778705901
+          },
+          {
+            "type": "state",
+            "value": -1,
+            "at": 1785778706100
+          },
+          {
+            "type": "error",
+            "value": 150,
+            "at": 1785778706102
+          }
+        ]
+      }
+    },
+    "path": "generated/youtube-7UXprjqSBvk-rawgithack-open/frames/frame-008-01500s.png",
+    "bytes": 12576,
+    "sha256": "6d29313d7c86b9e7a32b5cf0bae9069e796b1837edac3285da8a355647c4bbfb",
+    "width": 1280,
+    "height": 720,
+    "mean_rgb": [
+      41.06,
+      41.06,
+      41.06
+    ],
+    "stddev_rgb": [
+      11.84,
+      11.83,
+      11.82
+    ]
+  }
+]
