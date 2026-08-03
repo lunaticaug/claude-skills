@@ -1,0 +1,151 @@
+name: Retry real YouTube capture on no-auth Cobalt instances
+
+on:
+  push:
+    branches:
+      - tmp/cpptx-youtube-community-cobalt-20260804
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/cpptx-youtube-community-cobalt-noauth.yml
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install requests pillow
+      - name: Resolve and extract real frames
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact/frames
+          cat > artifact/run.py <<'PY'
+          import hashlib, json, math, random, subprocess, time
+          from pathlib import Path
+          from urllib.parse import urlparse
+          import requests
+          from PIL import Image, ImageDraw, ImageStat
+
+          root=Path('artifact'); frames=root/'frames'
+          start_s,end_s=1380,1740
+          source_urls=['https://youtu.be/7UXprjqSBvk','https://www.youtube.com/watch?v=7UXprjqSBvk']
+          endpoints=[
+            'https://api.cobalt.liubquanti.click',
+            'https://dog.kittycat.boo',
+            'https://cobaltapi.kittycat.boo',
+            'https://rue-cobalt.xenon.zone',
+            'https://cobaltapi.cjs.nz',
+          ]
+          payload_templates=[
+            lambda u:{'url':u},
+            lambda u:{'url':u,'videoQuality':'360','downloadMode':'mute'},
+            lambda u:{'url':u,'videoQuality':'480','downloadMode':'mute','youtubeVideoCodec':'h264','youtubeVideoContainer':'mp4'},
+            lambda u:{'url':u,'videoQuality':'360','downloadMode':'mute','youtubeVideoCodec':'h264','youtubeVideoContainer':'mp4','localProcessing':'disabled'},
+          ]
+          session=requests.Session(); session.headers.update({'User-Agent':'cpptx-trace-real-source-test/1.0 (+https://github.com/lunaticaug/claude-skills)','Accept':'application/json'})
+          attempts=[]; selected=[]; winner=None
+
+          def urls_from(payload):
+            if not isinstance(payload,dict): return []
+            status=payload.get('status'); out=[]
+            if status in {'redirect','tunnel'} and payload.get('url'): out.append(payload['url'])
+            elif status=='local-processing': out.extend(payload.get('tunnel') or [])
+            elif status=='picker': out.extend(item.get('url') for item in payload.get('picker') or [] if isinstance(item,dict) and item.get('type') in {'video','gif'} and item.get('url'))
+            return out
+
+          def clean(payload):
+            if isinstance(payload,dict):
+              return {k:('<redacted-media-url>' if k=='url' and isinstance(v,str) and v.startswith('http') else ['<redacted-media-url>' for _ in v] if k=='tunnel' and isinstance(v,list) else clean(v)) for k,v in payload.items()}
+            if isinstance(payload,list): return [clean(x) for x in payload]
+            return payload
+
+          request_number=0
+          for round_index in range(1,7):
+            if winner: break
+            for endpoint in endpoints:
+              if winner: break
+              for source_url in source_urls:
+                if winner: break
+                for template_index,template in enumerate(payload_templates,1):
+                  request_number+=1
+                  payload=template(source_url)
+                  entry={'round':round_index,'endpoint':endpoint,'source_url':source_url,'template_index':template_index}
+                  try:
+                    r=session.post(endpoint.rstrip('/')+'/',headers={'Content-Type':'application/json'},json=payload,timeout=150)
+                    entry.update({'http_status':r.status_code,'body_prefix':r.text[:1600]})
+                    try: data=r.json()
+                    except Exception: data=None
+                    entry['response']=clean(data)
+                    media_urls=urls_from(data)
+                    entry['media_candidate_count']=len(media_urls)
+                    for media_index,media_url in enumerate(media_urls[:3],1):
+                      run_dir=root/f'run-{request_number:03d}-{media_index}'
+                      run_dir.mkdir(exist_ok=True)
+                      command=['ffmpeg','-hide_banner','-y','-loglevel','warning','-rw_timeout','120000000','-ss',str(start_s),'-i',media_url,'-t',str(end_s-start_s),'-an','-vf',"fps=1/15,scale='min(960,iw)':-2",'-q:v','3',str(run_dir/'frame-%03d.jpg')]
+                      began=time.time()
+                      try:
+                        done=subprocess.run(command,text=True,capture_output=True,timeout=720)
+                        images=sorted(run_dir.glob('frame-*.jpg'))
+                        entry.setdefault('ffmpeg',[]).append({'media_index':media_index,'returncode':done.returncode,'duration_seconds':round(time.time()-began,3),'frame_count':len(images),'stderr_tail':done.stderr[-8000:].replace(media_url,'<redacted-media-url>')})
+                        if done.returncode==0 and len(images)>=4:
+                          winner={'endpoint':endpoint,'round':round_index,'request_number':request_number,'run_dir':str(run_dir)}
+                          break
+                      except Exception as exc:
+                        entry.setdefault('ffmpeg',[]).append({'media_index':media_index,'error':repr(exc),'duration_seconds':round(time.time()-began,3)})
+                    attempts.append(entry)
+                    if winner: break
+                  except Exception as exc:
+                    entry['error']=repr(exc); attempts.append(entry)
+                if endpoint=='https://api.cobalt.liubquanti.click' and not winner:
+                  time.sleep(random.uniform(1.0,3.0))
+          (root/'attempts.json').write_text(json.dumps(attempts,ensure_ascii=False,indent=2),encoding='utf-8')
+
+          if winner:
+            raw=sorted(Path(winner['run_dir']).glob('frame-*.jpg'))
+            indexes=list(range(len(raw))) if len(raw)<=25 else sorted({round(i*(len(raw)-1)/24) for i in range(25)})
+            for out_index,src_index in enumerate(indexes,1):
+              im=Image.open(raw[src_index]).convert('RGB'); target=frames/f'frame-{out_index:03d}.jpg'; im.save(target,'JPEG',quality=88,optimize=True); sec=start_s+src_index*15; st=ImageStat.Stat(im)
+              selected.append({'file':target.name,'source_second':sec,'source_timestamp':f'{sec//3600:02d}:{(sec%3600)//60:02d}:{sec%60:02d}','bytes':target.stat().st_size,'sha256':hashlib.sha256(target.read_bytes()).hexdigest(),'width':im.width,'height':im.height,'mean_rgb':[round(v,2) for v in st.mean],'stddev_rgb':[round(v,2) for v in st.stddev]})
+          hashes={x['sha256'] for x in selected}
+          result={'status':'actual_video_frames_captured' if len(selected)>=4 and len(hashes)>=2 else 'failed','video_id':'7UXprjqSBvk','source_start_seconds':start_s,'source_end_seconds':end_s,'winner':{k:v for k,v in (winner or {}).items() if k!='run_dir'},'selected_frame_count':len(selected),'unique_selected_hashes':len(hashes),'frames':selected}
+          (root/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+          if selected:
+            sheet=Image.new('RGB',(1280,360*math.ceil(len(selected)/2)),'white'); draw=ImageDraw.Draw(sheet)
+            for i,item in enumerate(selected):
+              im=Image.open(frames/item['file']).convert('RGB'); im.thumbnail((640,360)); canvas=Image.new('RGB',(640,360),'black'); canvas.paste(im,((640-im.width)//2,(360-im.height)//2)); x=(i%2)*640;y=(i//2)*360;sheet.paste(canvas,(x,y));draw.text((x+10,y+10),item['source_timestamp'],fill='white',stroke_width=2,stroke_fill='black')
+            sheet.save(root/'contact-sheet.jpg','JPEG',quality=90,optimize=True)
+          for directory in root.glob('run-*'):
+            if directory.is_dir():
+              for child in directory.iterdir(): child.unlink()
+              directory.rmdir()
+          PY
+          python artifact/run.py
+          cat artifact/result.json
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root=Path('artifact')
+          with zipfile.ZipFile(root/'cpptx-youtube-noauth-output.zip','w',zipfile.ZIP_DEFLATED) as z:
+            for p in sorted(root.rglob('*')):
+              if p.is_file() and p.name!='cpptx-youtube-noauth-output.zip': z.write(p,p.relative_to(root))
+          PY
+      - name: Upload output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpptx-youtube-noauth-output
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 2
