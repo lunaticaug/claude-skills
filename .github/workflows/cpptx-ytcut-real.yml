@@ -1,0 +1,407 @@
+name: Capture the actual YouTube seminar segment through YTCut
+
+on:
+  push:
+    branches:
+      - tmp/cpptx-ytcut-real-20260804
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/cpptx-ytcut-real.yml
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser and media tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright pillow requests
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb
+          google-chrome --version
+          ffmpeg -version | head -n 3
+      - name: Use YTCut's normal free server workflow for 23:00-23:20
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact/downloads artifact/frames artifact/evidence artifact/profile
+          cat > artifact/drive_ytcut.py <<'PY'
+          import json
+          import re
+          import time
+          from pathlib import Path
+          from urllib.parse import urlparse
+
+          import requests
+          from playwright.sync_api import sync_playwright
+
+          root = Path('artifact')
+          evidence = root / 'evidence'
+          downloads = root / 'downloads'
+          source_url = 'https://www.youtube.com/watch?v=7UXprjqSBvk'
+          candidates = []
+          request_log = []
+          response_log = []
+          browser_log = []
+          download_log = []
+
+          def add_candidate(url, source):
+              if not isinstance(url, str) or not url.startswith(('http://', 'https://')):
+                  return
+              lower = url.lower()
+              if any(token in lower for token in ['download', '.mp4', '.webm', '.mkv', '.m3u8', 'storage', 'signed', 'result', 'clip']):
+                  candidates.append({'url': url, 'source': source})
+
+          def harvest(value, source='json'):
+              if isinstance(value, dict):
+                  for key, item in value.items():
+                      if isinstance(item, str):
+                          add_candidate(item, f'{source}:{key}')
+                      else:
+                          harvest(item, f'{source}:{key}')
+              elif isinstance(value, list):
+                  for item in value:
+                      harvest(item, source)
+
+          def redact_url(url):
+              if not isinstance(url, str):
+                  return url
+              parsed = urlparse(url)
+              return f'{parsed.scheme}://{parsed.netloc}{parsed.path}' if parsed.scheme else url
+
+          def snapshot(page, label):
+              try:
+                  state = page.evaluate("""() => ({
+                    url: location.href,
+                    title: document.title,
+                    bodyText: (document.body?.innerText || '').slice(0, 15000),
+                    inputs: [...document.querySelectorAll('input')].map((e,i)=>({i,type:e.type,name:e.name,id:e.id,placeholder:e.placeholder,value:e.value,min:e.min,max:e.max,step:e.step,visible:!!(e.offsetWidth||e.offsetHeight||e.getClientRects().length)})),
+                    selects: [...document.querySelectorAll('select')].map((e,i)=>({i,name:e.name,id:e.id,value:e.value,options:[...e.options].map(o=>({value:o.value,text:o.text,selected:o.selected})),visible:!!(e.offsetWidth||e.offsetHeight||e.getClientRects().length)})),
+                    buttons: [...document.querySelectorAll('button,a,[role=button]')].map((e,i)=>({i,text:(e.innerText||e.getAttribute('aria-label')||'').trim().slice(0,300),href:e.href||'',disabled:!!e.disabled,visible:!!(e.offsetWidth||e.offsetHeight||e.getClientRects().length)})).filter(x=>x.visible).slice(0,250)
+                  })""")
+                  (evidence / f'{label}.json').write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding='utf-8')
+                  page.screenshot(path=str(evidence / f'{label}.png'), full_page=False)
+              except Exception as exc:
+                  (evidence / f'{label}-error.txt').write_text(repr(exc), encoding='utf-8')
+
+          with sync_playwright() as p:
+              context = p.chromium.launch_persistent_context(
+                  str(root / 'profile'),
+                  executable_path='/usr/bin/google-chrome',
+                  headless=False,
+                  viewport={'width': 1440, 'height': 1000},
+                  locale='en-US',
+                  timezone_id='Asia/Seoul',
+                  accept_downloads=True,
+                  ignore_default_args=['--enable-automation'],
+                  args=[
+                      '--disable-blink-features=AutomationControlled',
+                      '--disable-dev-shm-usage',
+                      '--no-first-run',
+                      '--no-default-browser-check',
+                      '--window-size=1440,1000',
+                  ],
+              )
+              context.add_init_script("Object.defineProperty(navigator,'webdriver',{get:()=>undefined});")
+              page = context.pages[0] if context.pages else context.new_page()
+
+              page.on('console', lambda msg: browser_log.append({'type': f'console:{msg.type}', 'text': msg.text[:3000]}))
+              page.on('pageerror', lambda exc: browser_log.append({'type': 'pageerror', 'text': str(exc)[:3000]}))
+              page.on('requestfailed', lambda req: browser_log.append({'type': 'requestfailed', 'text': f'{redact_url(req.url)} :: {req.failure}'[:3000]}))
+
+              def on_request(req):
+                  if req.method != 'GET' or req.resource_type in {'xhr', 'fetch', 'document'}:
+                      request_log.append({
+                          'method': req.method,
+                          'resource_type': req.resource_type,
+                          'url': redact_url(req.url),
+                          'post_data': (req.post_data or '')[:12000],
+                      })
+
+              def on_response(resp):
+                  try:
+                      ctype = (resp.headers.get('content-type') or '').lower()
+                      dispo = resp.headers.get('content-disposition') or ''
+                      entry = {
+                          'status': resp.status,
+                          'url': redact_url(resp.url),
+                          'content_type': ctype,
+                          'content_disposition': dispo,
+                          'request_method': resp.request.method,
+                      }
+                      if 'json' in ctype:
+                          try:
+                              data = resp.json()
+                              harvest(data, resp.url)
+                              entry['json'] = data
+                          except Exception as exc:
+                              entry['json_error'] = repr(exc)
+                      elif ctype.startswith('video/') or 'attachment' in dispo.lower():
+                          add_candidate(resp.url, f'response:{ctype}:{dispo}')
+                      if resp.request.method != 'GET' or resp.request.resource_type in {'xhr', 'fetch'} or 'api' in resp.url:
+                          response_log.append(entry)
+                  except Exception:
+                      pass
+
+              def on_download(download):
+                  try:
+                      name = download.suggested_filename or f'download-{len(download_log)+1}.bin'
+                      path = downloads / name
+                      download.save_as(str(path))
+                      download_log.append({'file': path.name, 'bytes': path.stat().st_size, 'url': '<redacted>'})
+                  except Exception as exc:
+                      download_log.append({'error': repr(exc)})
+
+              page.on('request', on_request)
+              page.on('response', on_response)
+              page.on('download', on_download)
+
+              page.goto('https://ytcut.org/', wait_until='domcontentloaded', timeout=90000)
+              page.wait_for_timeout(6000)
+              snapshot(page, '01-landing')
+
+              # Dismiss optional cookie or quota dialogs without signing in.
+              for pattern in [r'accept', r'agree', r'close', r'not now', r'continue as guest']:
+                  try:
+                      button = page.get_by_role('button', name=re.compile(pattern, re.I)).first
+                      if button.is_visible(timeout=500):
+                          button.click(timeout=3000)
+                          page.wait_for_timeout(500)
+                  except Exception:
+                      pass
+
+              textbox = page.get_by_role('textbox', name=re.compile(r'YouTube URL|video ID|paste', re.I)).first
+              if not textbox.is_visible(timeout=5000):
+                  textbox = page.locator("input[type=url],input[type=text]").first
+              textbox.fill(source_url)
+              try:
+                  page.get_by_role('button', name=re.compile(r'load video', re.I)).click(timeout=5000)
+              except Exception:
+                  textbox.press('Enter')
+
+              # Wait for the metadata/timeline editor to become active.
+              deadline = time.time() + 150
+              while time.time() < deadline:
+                  body = page.locator('body').inner_text(timeout=5000)
+                  if '지속가능성 공시 의무화 시대' in body or ('Start — type or button' in body and '00:00 / 00:00' not in body):
+                      break
+                  page.wait_for_timeout(2000)
+              snapshot(page, '02-loaded')
+
+              # The editor exposes two time text fields with the same placeholder.
+              time_fields = page.locator("input[placeholder*='HH:MM:SS'], input[placeholder*='MM:SS']")
+              visible = []
+              for index in range(time_fields.count()):
+                  loc = time_fields.nth(index)
+                  try:
+                      if loc.is_visible(timeout=300):
+                          visible.append(loc)
+                  except Exception:
+                      pass
+              if len(visible) < 2:
+                  raise RuntimeError(f'Expected two visible time fields, found {len(visible)}')
+              visible[0].fill('00:23:00.000')
+              visible[0].press('Tab')
+              visible[1].fill('00:23:20.000')
+              visible[1].press('Tab')
+
+              # Select MP4 and a modest quality for a fast, reliable test.
+              for select_index in range(page.locator('select').count()):
+                  select = page.locator('select').nth(select_index)
+                  try:
+                      if not select.is_visible(timeout=300):
+                          continue
+                      options = select.locator('option').all_text_contents()
+                      joined = ' '.join(options).lower()
+                      if 'mp4' in joined:
+                          try:
+                              select.select_option(label=re.compile(r'MP4', re.I))
+                          except Exception:
+                              for option in select.locator('option').all():
+                                  text = option.inner_text()
+                                  if 'mp4' in text.lower():
+                                      select.select_option(value=option.get_attribute('value'))
+                                      break
+                      elif any(q in joined for q in ['360', '480', '720']):
+                          chosen = next((q for q in ['360', '480', '720'] if q in joined), None)
+                          if chosen:
+                              for option in select.locator('option').all():
+                                  text = option.inner_text()
+                                  if chosen in text:
+                                      select.select_option(value=option.get_attribute('value'))
+                                      break
+                  except Exception:
+                      pass
+
+              # Select the server path explicitly when available.
+              try:
+                  server = page.get_by_text(re.compile(r'^Server$', re.I)).first
+                  if server.is_visible(timeout=800):
+                      server.click(timeout=3000)
+              except Exception:
+                  pass
+              snapshot(page, '03-range-set')
+
+              cut_button = page.get_by_text(re.compile(r'^Cut\s*&?\s*download$', re.I)).first
+              if not cut_button.is_visible(timeout=3000):
+                  cut_button = page.get_by_role('button', name=re.compile(r'cut.*download', re.I)).first
+              cut_button.click(timeout=8000)
+              snapshot(page, '04-submitted')
+
+              # Let the normal UI poll its job until Ready or a downloadable response appears.
+              deadline = time.time() + 900
+              last_snapshot = 0
+              while time.time() < deadline:
+                  body = page.locator('body').inner_text(timeout=8000)
+                  if download_log:
+                      break
+                  if any(marker in body for marker in ['Your download should have started automatically', 'Download again', 'Ready']) and 'Preparing your clip' not in body:
+                      for pattern in [r'download again', r'^download$', r'copy link']:
+                          try:
+                              action = page.get_by_text(re.compile(pattern, re.I)).first
+                              if action.is_visible(timeout=500):
+                                  action.click(timeout=5000)
+                                  page.wait_for_timeout(3000)
+                                  if download_log:
+                                      break
+                          except Exception:
+                              pass
+                  now = time.time()
+                  if now - last_snapshot > 60:
+                      snapshot(page, f'05-progress-{int(now)}')
+                      last_snapshot = now
+                  page.wait_for_timeout(3000)
+              snapshot(page, '06-final')
+              context.close()
+
+          # Store raw network evidence locally, but redact expiring media URLs in committed JSON.
+          unique = []
+          for item in candidates:
+              url = item['url']
+              if url not in [x['url'] for x in unique]:
+                  unique.append(item)
+          (root / '.media-candidates.json').write_text(json.dumps(unique, ensure_ascii=False), encoding='utf-8')
+
+          def redact(value):
+              if isinstance(value, dict):
+                  return {key: ('<redacted-url>' if isinstance(item, str) and item.startswith(('http://', 'https://')) and key.lower() in {'url','download_url','file_url','href'} else redact(item)) for key, item in value.items()}
+              if isinstance(value, list):
+                  return [redact(item) for item in value]
+              return value
+
+          (root / 'request-log.json').write_text(json.dumps(request_log, ensure_ascii=False, indent=2), encoding='utf-8')
+          (root / 'response-log.json').write_text(json.dumps(redact(response_log), ensure_ascii=False, indent=2), encoding='utf-8')
+          (root / 'browser-log.json').write_text(json.dumps(browser_log[-2000:], ensure_ascii=False, indent=2), encoding='utf-8')
+          (root / 'download-log.json').write_text(json.dumps(download_log, ensure_ascii=False, indent=2), encoding='utf-8')
+          PY
+
+          xvfb-run -a -s '-screen 0 1440x1000x24' python artifact/drive_ytcut.py > artifact/browser-run.log 2>&1 || true
+          rm -rf artifact/profile
+
+          cat > artifact/collect_media.py <<'PY'
+          import json
+          import shutil
+          import subprocess
+          import time
+          from pathlib import Path
+          from urllib.parse import urlparse
+
+          import requests
+
+          root = Path('artifact')
+          downloads = root / 'downloads'
+          output = root / 'youtube-7UXprjqSBvk-23m00s-23m20s.mp4'
+          attempts = []
+
+          # Prefer a file downloaded by the normal browser workflow.
+          files = [path for path in downloads.glob('*') if path.is_file() and path.stat().st_size > 100000]
+          for path in files:
+              probe = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'stream=codec_type', '-of', 'json', str(path)], text=True, capture_output=True)
+              attempts.append({'kind': 'browser_download', 'file': path.name, 'bytes': path.stat().st_size, 'ffprobe_returncode': probe.returncode})
+              if probe.returncode == 0 and 'video' in probe.stdout:
+                  shutil.copy2(path, output)
+                  break
+
+          # If the UI exposed a signed link rather than a browser download, fetch it immediately.
+          if not output.exists():
+              candidate_file = root / '.media-candidates.json'
+              candidates = json.loads(candidate_file.read_text(encoding='utf-8')) if candidate_file.exists() else []
+              session = requests.Session()
+              session.headers.update({'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/150 Safari/537.36', 'Referer': 'https://ytcut.org/'})
+              for index, item in enumerate(candidates, 1):
+                  url = item.get('url')
+                  entry = {'kind': 'candidate_url', 'index': index, 'host': urlparse(url).netloc if url else None, 'source': item.get('source')}
+                  try:
+                      response = session.get(url, stream=True, timeout=180, allow_redirects=True)
+                      entry.update({'http_status': response.status_code, 'content_type': response.headers.get('content-type'), 'content_length': response.headers.get('content-length')})
+                      response.raise_for_status()
+                      temp = root / f'candidate-{index:03d}.bin'
+                      with temp.open('wb') as handle:
+                          for chunk in response.iter_content(1024 * 1024):
+                              if chunk:
+                                  handle.write(chunk)
+                      probe = subprocess.run(['ffprobe', '-v', 'error', '-show_entries', 'stream=codec_type', '-of', 'json', str(temp)], text=True, capture_output=True)
+                      entry.update({'bytes': temp.stat().st_size, 'ffprobe_returncode': probe.returncode})
+                      if probe.returncode == 0 and 'video' in probe.stdout:
+                          shutil.move(str(temp), output)
+                          attempts.append(entry)
+                          break
+                      temp.unlink(missing_ok=True)
+                  except Exception as exc:
+                      entry['error'] = repr(exc)
+                  attempts.append(entry)
+
+          (root / 'media-collection-attempts.json').write_text(json.dumps(attempts, ensure_ascii=False, indent=2), encoding='utf-8')
+          PY
+          python artifact/collect_media.py
+          rm -f artifact/.media-candidates.json artifact/candidate-*.bin
+
+          if [[ -s artifact/youtube-7UXprjqSBvk-23m00s-23m20s.mp4 ]]; then
+            ffprobe -v error -show_format -show_streams -of json artifact/youtube-7UXprjqSBvk-23m00s-23m20s.mp4 > artifact/ffprobe.json
+            ffmpeg -y -i artifact/youtube-7UXprjqSBvk-23m00s-23m20s.mp4 -vf 'fps=2,scale=1280:-2' -q:v 2 artifact/frames/frame-%03d.jpg > artifact/ffmpeg.log 2>&1
+          fi
+
+          python - <<'PY'
+          import hashlib, json, math
+          from pathlib import Path
+          from PIL import Image, ImageDraw, ImageStat
+          root=Path('artifact'); video=root/'youtube-7UXprjqSBvk-23m00s-23m20s.mp4'; paths=sorted((root/'frames').glob('*.jpg')); records=[]
+          for i,path in enumerate(paths):
+              image=Image.open(path).convert('RGB'); stat=ImageStat.Stat(image); sec=1380+i/2
+              records.append({'file':path.name,'source_second':sec,'source_timestamp':f'{int(sec)//3600:02d}:{(int(sec)%3600)//60:02d}:{int(sec)%60:02d}.{int((sec%1)*10)}','bytes':path.stat().st_size,'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'width':image.width,'height':image.height,'mean_rgb':[round(v,2) for v in stat.mean],'stddev_rgb':[round(v,2) for v in stat.stddev]})
+          hashes={item['sha256'] for item in records}; result={'status':'actual_video_clip_captured' if video.exists() and video.stat().st_size>100000 and len(records)>=4 and len(hashes)>=2 else 'failed','video_id':'7UXprjqSBvk','source_start_seconds':1380,'source_end_seconds':1400,'video_file':video.name if video.exists() else None,'video_bytes':video.stat().st_size if video.exists() else 0,'frame_count':len(records),'unique_frame_hashes':len(hashes),'frames':records}
+          (root/'result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+          if records:
+              cols=4; w,h=320,180; rows=math.ceil(len(records)/cols); sheet=Image.new('RGB',(cols*w,rows*h),'white'); draw=ImageDraw.Draw(sheet)
+              for i,item in enumerate(records):
+                  image=Image.open(root/'frames'/item['file']).convert('RGB'); image.thumbnail((w,h)); canvas=Image.new('RGB',(w,h),'black'); canvas.paste(image,((w-image.width)//2,(h-image.height)//2)); x=(i%cols)*w; y=(i//cols)*h; sheet.paste(canvas,(x,y)); draw.text((x+6,y+6),item['source_timestamp'],fill='white',stroke_width=2,stroke_fill='black')
+              sheet.save(root/'contact-sheet.jpg','JPEG',quality=90,optimize=True)
+          PY
+          cat artifact/result.json
+          python - <<'PY'
+          from pathlib import Path
+          import zipfile
+          root=Path('artifact')
+          with zipfile.ZipFile(root/'cpptx-ytcut-real-output.zip','w',zipfile.ZIP_DEFLATED) as archive:
+              for path in sorted(root.rglob('*')):
+                  if path.is_file() and path.name!='cpptx-ytcut-real-output.zip':
+                      archive.write(path,path.relative_to(root))
+          PY
+      - name: Upload real clip and frames
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpptx-ytcut-real-output
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 2
