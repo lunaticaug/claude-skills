@@ -1,0 +1,251 @@
+name: Capture actual 23:00 frames from YTCut direct preview
+
+on:
+  push:
+    branches:
+      - tmp/cpptx-ytcut-preview-20260804
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/cpptx-ytcut-preview.yml
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install browser tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright pillow
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb
+          google-chrome --version
+      - name: Load the supplied video in the site's direct preview and seek from 23:00
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifact/frames artifact/profile artifact/evidence
+          cat > artifact/capture.py <<'PY'
+          import hashlib
+          import json
+          import math
+          import re
+          import time
+          from pathlib import Path
+
+          from PIL import Image, ImageDraw, ImageStat
+          from playwright.sync_api import sync_playwright
+
+          root = Path('artifact')
+          frames_dir = root / 'frames'
+          evidence = root / 'evidence'
+          source_url = 'https://www.youtube.com/watch?v=7UXprjqSBvk'
+          targets = list(range(1380, 1401, 2))
+          events = []
+          states = []
+          records = []
+
+          def snapshot(page, label):
+              try:
+                  page.screenshot(path=str(evidence / f'{label}.png'), full_page=False)
+                  state = page.evaluate("""() => ({
+                    href: location.href,
+                    title: document.title,
+                    body: (document.body?.innerText || '').slice(0, 8000),
+                    videos: [...document.querySelectorAll('video')].map((v,i)=>({
+                      i,
+                      readyState:v.readyState,
+                      networkState:v.networkState,
+                      error:v.error ? {code:v.error.code,message:v.error.message}:null,
+                      duration:v.duration,
+                      currentTime:v.currentTime,
+                      paused:v.paused,
+                      videoWidth:v.videoWidth,
+                      videoHeight:v.videoHeight,
+                      currentSrc:v.currentSrc ? '<present>' : '<empty>',
+                      srcAttr:v.getAttribute('src') ? '<present>' : '<empty>',
+                      visible:!!(v.offsetWidth||v.offsetHeight||v.getClientRects().length)
+                    })),
+                    iframes:[...document.querySelectorAll('iframe')].map((f,i)=>({i,src:f.src,visible:!!(f.offsetWidth||f.offsetHeight||f.getClientRects().length)}))
+                  })""")
+                  states.append({'label': label, 'state': state})
+              except Exception as exc:
+                  states.append({'label': label, 'error': repr(exc)})
+
+          with sync_playwright() as p:
+              context = p.chromium.launch_persistent_context(
+                  str(root / 'profile'),
+                  executable_path='/usr/bin/google-chrome',
+                  headless=False,
+                  viewport={'width': 1440, 'height': 1000},
+                  locale='ko-KR',
+                  timezone_id='Asia/Seoul',
+                  ignore_default_args=['--enable-automation'],
+                  args=[
+                      '--autoplay-policy=no-user-gesture-required',
+                      '--disable-blink-features=AutomationControlled',
+                      '--disable-dev-shm-usage',
+                      '--no-first-run',
+                      '--no-default-browser-check',
+                      '--window-size=1440,1000',
+                  ],
+              )
+              context.add_init_script("Object.defineProperty(navigator,'webdriver',{get:()=>undefined});")
+              page = context.pages[0] if context.pages else context.new_page()
+              page.on('console', lambda message: events.append({'type': f'console:{message.type}', 'text': message.text[:3000]}))
+              page.on('requestfailed', lambda request: events.append({'type': 'requestfailed', 'text': f'{request.url.split("?")[0]} :: {request.failure}'[:3000]}))
+
+              page.goto('https://ytcut.org/', wait_until='domcontentloaded', timeout=90000)
+              page.wait_for_timeout(6000)
+              snapshot(page, '01-landing')
+
+              for pattern in [r'accept', r'agree', r'close', r'not now', r'continue as guest']:
+                  try:
+                      button = page.get_by_role('button', name=re.compile(pattern, re.I)).first
+                      if button.is_visible(timeout=500):
+                          button.click(timeout=3000)
+                          page.wait_for_timeout(500)
+                  except Exception:
+                      pass
+
+              textbox = page.get_by_role('textbox', name=re.compile(r'YouTube URL|video ID|paste', re.I)).first
+              if not textbox.is_visible(timeout=5000):
+                  textbox = page.locator("input[type=url],input[type=text]").first
+              textbox.fill(source_url)
+              try:
+                  page.get_by_role('button', name=re.compile(r'load video', re.I)).click(timeout=5000)
+              except Exception:
+                  textbox.press('Enter')
+
+              deadline = time.time() + 240
+              usable_index = None
+              while time.time() < deadline:
+                  try:
+                      video_states = page.evaluate("""() => [...document.querySelectorAll('video')].map((v,i)=>({i,readyState:v.readyState,duration:v.duration,videoWidth:v.videoWidth,videoHeight:v.videoHeight,visible:!!(v.offsetWidth||v.offsetHeight||v.getClientRects().length),error:v.error?{code:v.error.code,message:v.error.message}:null}))""")
+                      for item in video_states:
+                          if item.get('readyState', 0) >= 2 and item.get('duration', 0) > 9000 and item.get('videoWidth', 0) > 0:
+                              usable_index = item['i']
+                              break
+                  except Exception:
+                      pass
+                  if usable_index is not None:
+                      break
+                  page.wait_for_timeout(2500)
+              snapshot(page, '02-preview-ready-or-timeout')
+
+              if usable_index is None:
+                  raise RuntimeError('No full-duration direct-preview video element became seekable')
+
+              # Expand the decoded preview to a clean capture surface.
+              page.evaluate("""(index) => {
+                  const v = [...document.querySelectorAll('video')][index];
+                  if (!v) return;
+                  document.body.innerHTML = '';
+                  document.documentElement.style.margin='0';
+                  document.body.style.margin='0';
+                  document.body.style.background='black';
+                  v.style.position='fixed';
+                  v.style.left='0';
+                  v.style.top='0';
+                  v.style.width='1280px';
+                  v.style.height='720px';
+                  v.style.objectFit='contain';
+                  v.style.background='black';
+                  document.body.appendChild(v);
+              }""", usable_index)
+              page.set_viewport_size({'width':1280,'height':720})
+              video = page.locator('video').first
+
+              for output_index, second in enumerate(targets, 1):
+                  record = {'output_index': output_index, 'source_second': second, 'source_timestamp': f'{second // 3600:02d}:{(second % 3600) // 60:02d}:{second % 60:02d}'}
+                  try:
+                      state = page.evaluate("""async (second) => {
+                          const v=document.querySelector('video');
+                          if(!v) return {ok:false,reason:'video-missing'};
+                          v.muted=true;
+                          const done=new Promise(resolve=>{
+                            let settled=false;
+                            const finish=()=>{if(!settled){settled=true;resolve();}};
+                            v.addEventListener('seeked',finish,{once:true});
+                            setTimeout(finish,15000);
+                          });
+                          v.currentTime=second;
+                          await done;
+                          try{await v.play();}catch(e){}
+                          await new Promise(r=>setTimeout(r,1200));
+                          v.pause();
+                          return {ok:v.readyState>=2&&v.videoWidth>0,readyState:v.readyState,duration:v.duration,currentTime:v.currentTime,videoWidth:v.videoWidth,videoHeight:v.videoHeight,error:v.error?{code:v.error.code,message:v.error.message}:null};
+                      }""", second)
+                      target = frames_dir / f'frame-{output_index:03d}-{second:05d}s.png'
+                      video.screenshot(path=str(target), timeout=30000)
+                      image = Image.open(target).convert('RGB')
+                      stat = ImageStat.Stat(image)
+                      valid = bool(state.get('ok') and state.get('duration',0)>9000 and abs(state.get('currentTime',0)-second)<10)
+                      record.update({
+                          'status':'captured' if valid else 'unverified',
+                          'video_state':state,
+                          'file':target.name,
+                          'bytes':target.stat().st_size,
+                          'sha256':hashlib.sha256(target.read_bytes()).hexdigest(),
+                          'width':image.width,
+                          'height':image.height,
+                          'mean_rgb':[round(value,2) for value in stat.mean],
+                          'stddev_rgb':[round(value,2) for value in stat.stddev],
+                      })
+                  except Exception as exc:
+                      record.update({'status':'failed','error':repr(exc)})
+                  records.append(record)
+              context.close()
+
+          (root / 'states.json').write_text(json.dumps(states, ensure_ascii=False, indent=2), encoding='utf-8')
+          (root / 'events.json').write_text(json.dumps(events[-2000:], ensure_ascii=False, indent=2), encoding='utf-8')
+          (root / 'capture-records.json').write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding='utf-8')
+          captured = [item for item in records if item.get('status') == 'captured']
+          hashes = {item['sha256'] for item in captured}
+          sheet_items = captured if captured else [item for item in records if item.get('file')]
+          if sheet_items:
+              cols, width, height = 3, 426, 240
+              rows = math.ceil(len(sheet_items) / cols)
+              sheet = Image.new('RGB', (cols * width, rows * height), 'white')
+              draw = ImageDraw.Draw(sheet)
+              for index, item in enumerate(sheet_items):
+                  image = Image.open(frames_dir / item['file']).convert('RGB')
+                  image.thumbnail((width, height))
+                  canvas = Image.new('RGB', (width, height), 'black')
+                  canvas.paste(image, ((width-image.width)//2, (height-image.height)//2))
+                  x, y = (index % cols) * width, (index // cols) * height
+                  sheet.paste(canvas, (x,y))
+                  draw.text((x+7,y+7), item['source_timestamp'], fill='white', stroke_width=2, stroke_fill='black')
+              sheet.save(root / 'contact-sheet.jpg', 'JPEG', quality=90, optimize=True)
+          result = {
+              'status':'actual_video_frames_captured' if len(captured)>=4 and len(hashes)>=2 else 'failed',
+              'video_id':'7UXprjqSBvk',
+              'source_start_seconds':min(targets),
+              'source_end_seconds':max(targets),
+              'requested_frame_count':len(targets),
+              'captured_frame_count':len(captured),
+              'unique_frame_hashes':len(hashes),
+              'frames':records,
+          }
+          (root / 'result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+          PY
+          xvfb-run -a -s '-screen 0 1440x1000x24' python artifact/capture.py > artifact/capture.log 2>&1 || true
+          rm -rf artifact/profile
+          cat artifact/result.json || true
+      - name: Upload actual direct-preview frames
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpptx-ytcut-preview-output
+          path: artifact/
+          if-no-files-found: error
+          retention-days: 2
