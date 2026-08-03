@@ -1,0 +1,22 @@
+[
+  {
+    "endpoint": "https://pipedapi.adminforge.de",
+    "status": "failed",
+    "error": "ConnectionError(MaxRetryError('HTTPSConnectionPool(host=\\'adminforge.destreams\\', port=443): Max retries exceeded with url: /7UXprjqSBvk (Caused by NameResolutionError(\"HTTPSConnection(host=\\'adminforge.destreams\\', port=443): Failed to resolve \\'adminforge.destreams\\' ([Errno -2] Name or service not known)\"))'))"
+  },
+  {
+    "endpoint": "https://pipedapi.leptons.xyz",
+    "status": "failed",
+    "error": "HTTPError('403 Client Error: Forbidden for url: https://pipedapi.leptons.xyz/streams/7UXprjqSBvk')"
+  },
+  {
+    "endpoint": "https://pipedapi.kavin.rocks",
+    "status": "failed",
+    "error": "HTTPError('526 Server Error: <none> for url: https://pipedapi.kavin.rocks/streams/7UXprjqSBvk')"
+  },
+  {
+    "endpoint": "https://api.piped.yt",
+    "status": "failed",
+    "error": "ConnectionError(MaxRetryError('HTTPSConnectionPool(host=\\'api.piped.yt\\', port=443): Max retries exceeded with url: /streams/7UXprjqSBvk (Caused by NameResolutionError(\"HTTPSConnection(host=\\'api.piped.yt\\', port=443): Failed to resolve \\'api.piped.yt\\' ([Errno -2] Name or service not known)\"))'))"
+  }
+]

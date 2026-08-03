@@ -1,0 +1,158 @@
+name: Temporary YouTube embed capture with referrer
+
+on:
+  push:
+    branches:
+      - tmp/cpptx-youtube-7ux-23m-20260804
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  referrer-frames:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install browser tools
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install playwright pillow
+          python -m playwright install chromium
+
+      - name: Serve a referring page and capture YouTube frames
+        shell: bash
+        run: |
+          ROOT='generated/youtube-7UXprjqSBvk-23m-v4'
+          rm -rf "$ROOT"
+          mkdir -p "$ROOT/frames" "$ROOT/site"
+          cat > "$ROOT/site/player.html" <<'HTML'
+          <!doctype html>
+          <html lang="ko">
+          <head>
+            <meta charset="utf-8">
+            <meta name="referrer" content="strict-origin-when-cross-origin">
+            <style>
+              html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+              iframe { display: block; border: 0; width: 1280px; height: 720px; }
+            </style>
+          </head>
+          <body>
+            <iframe id="yt" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+            <script>
+              const params = new URLSearchParams(location.search);
+              const start = params.get('start') || '1380';
+              const host = params.get('host') === 'cookie' ? 'https://www.youtube-nocookie.com' : 'https://www.youtube.com';
+              const origin = encodeURIComponent(location.origin);
+              document.getElementById('yt').src = `${host}/embed/7UXprjqSBvk?start=${start}&autoplay=1&mute=1&controls=0&rel=0&playsinline=1&enablejsapi=1&origin=${origin}`;
+            </script>
+          </body>
+          </html>
+          HTML
+          python -m http.server 8765 --bind 127.0.0.1 --directory "$ROOT/site" > "$ROOT/http-server.log" 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID >/dev/null 2>&1 || true' EXIT
+          sleep 2
+
+          cat > "$ROOT/capture.py" <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          from PIL import Image, ImageStat
+          from playwright.sync_api import sync_playwright
+
+          root = Path('generated/youtube-7UXprjqSBvk-23m-v4')
+          out = root / 'frames'
+          targets = [1380, 1395, 1410, 1430, 1460, 1500, 1560, 1620]
+          records = []
+          with sync_playwright() as p:
+              browser = p.chromium.launch(
+                  headless=True,
+                  args=['--autoplay-policy=no-user-gesture-required', '--disable-dev-shm-usage'],
+              )
+              context = browser.new_context(
+                  viewport={'width': 1280, 'height': 720},
+                  locale='ko-KR',
+                  extra_http_headers={'Referer': 'http://127.0.0.1:8765/'},
+              )
+              page = context.new_page()
+              for index, second in enumerate(targets, 1):
+                  candidates = []
+                  for host in ('youtube', 'cookie'):
+                      url = f'http://127.0.0.1:8765/player.html?start={second}&host={host}'
+                      item = {'source_second': second, 'host': host, 'page_url': url}
+                      try:
+                          page.goto(url, wait_until='domcontentloaded', timeout=45000)
+                          page.wait_for_timeout(8000)
+                          shot = out / f'candidate-{index:03d}-{host}-{second:05d}s.png'
+                          page.screenshot(path=str(shot), full_page=False)
+                          image = Image.open(shot).convert('RGB')
+                          stat = ImageStat.Stat(image)
+                          score = sum(stat.stddev) + min(shot.stat().st_size / 8000, 150)
+                          item.update({
+                              'status': 'captured',
+                              'path': str(shot),
+                              'bytes': shot.stat().st_size,
+                              'sha256': hashlib.sha256(shot.read_bytes()).hexdigest(),
+                              'mean_rgb': [round(v, 2) for v in stat.mean],
+                              'stddev_rgb': [round(v, 2) for v in stat.stddev],
+                              'visual_score': round(score, 3),
+                              'iframe_count': page.locator('iframe').count(),
+                          })
+                          candidates.append((score, item, shot))
+                      except Exception as exc:
+                          item.update({'status': 'failed', 'error': repr(exc)})
+                      records.append(item)
+                  if candidates:
+                      score, selected, source = max(candidates, key=lambda x: x[0])
+                      final = out / f'frame-{index:03d}-{second:05d}s.png'
+                      final.write_bytes(source.read_bytes())
+                      selected['selected'] = True
+              browser.close()
+
+          selected_frames = sorted(out.glob('frame-*.png'))
+          hashes = {hashlib.sha256(path.read_bytes()).hexdigest() for path in selected_frames}
+          result = {
+              'status': 'referrer_embed_frames_captured' if selected_frames else 'failed',
+              'video_id': '7UXprjqSBvk',
+              'source_start_seconds': 1380,
+              'source_end_seconds': 1620,
+              'selected_frame_count': len(selected_frames),
+              'unique_selected_hashes': len(hashes),
+              'selected_files': [path.name for path in selected_frames],
+          }
+          (root / 'capture-records.json').write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding='utf-8')
+          (root / 'result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+          PY
+          python "$ROOT/capture.py" > "$ROOT/capture.log" 2>&1
+
+      - name: Commit output
+        if: always()
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add generated/youtube-7UXprjqSBvk-23m-v4
+          if git diff --cached --quiet; then
+            echo 'No output to commit.'
+          else
+            git commit -m 'ci: capture YouTube frames with valid referrer from 23:00'
+            git push origin HEAD:${GITHUB_REF_NAME}
+          fi
+
+      - name: Upload output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpptx-youtube-7ux-23m-v4
+          path: generated/youtube-7UXprjqSBvk-23m-v4/
+          retention-days: 1

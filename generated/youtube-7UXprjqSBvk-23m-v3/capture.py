@@ -1,0 +1,93 @@
+import hashlib
+import json
+from pathlib import Path
+from PIL import Image, ImageStat
+from playwright.sync_api import sync_playwright
+
+root = Path('generated/youtube-7UXprjqSBvk-23m-v3')
+frames = root / 'frames'
+targets = [1380, 1395, 1410, 1430, 1460, 1500, 1560, 1620]
+hosts = [
+    'https://www.youtube-nocookie.com/embed/7UXprjqSBvk',
+    'https://www.youtube.com/embed/7UXprjqSBvk',
+]
+records = []
+
+with sync_playwright() as p:
+    browser = p.chromium.launch(
+        headless=True,
+        args=[
+            '--autoplay-policy=no-user-gesture-required',
+            '--disable-dev-shm-usage',
+            '--disable-features=MediaRouter',
+        ],
+    )
+    context = browser.new_context(
+        viewport={'width': 1280, 'height': 720},
+        locale='ko-KR',
+        user_agent='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36',
+    )
+    page = context.new_page()
+    for index, second in enumerate(targets, 1):
+        best = None
+        for host_index, host in enumerate(hosts, 1):
+            url = (
+                f'{host}?start={second}&autoplay=1&mute=1&controls=0'
+                '&rel=0&playsinline=1&modestbranding=1'
+            )
+            item = {'source_second': second, 'host': host, 'url': url}
+            try:
+                response = page.goto(url, wait_until='domcontentloaded', timeout=45000)
+                page.wait_for_timeout(5500)
+                shot = frames / f'candidate-{index:03d}-h{host_index}-{second:05d}s.png'
+                page.screenshot(path=str(shot), full_page=False)
+                image = Image.open(shot).convert('RGB')
+                stat = ImageStat.Stat(image)
+                body_text = ''
+                try:
+                    body_text = page.locator('body').inner_text(timeout=2500)[:1500]
+                except Exception:
+                    pass
+                item.update({
+                    'status': 'captured',
+                    'http_status': response.status if response else None,
+                    'path': str(shot),
+                    'title': page.title(),
+                    'body_text': body_text,
+                    'bytes': shot.stat().st_size,
+                    'sha256': hashlib.sha256(shot.read_bytes()).hexdigest(),
+                    'mean_rgb': [round(v, 2) for v in stat.mean],
+                    'stddev_rgb': [round(v, 2) for v in stat.stddev],
+                })
+                score = sum(stat.stddev) + min(shot.stat().st_size / 10000, 100)
+                item['visual_score'] = round(score, 3)
+                if best is None or score > best[0]:
+                    best = (score, item, shot)
+            except Exception as exc:
+                item.update({'status': 'failed', 'error': repr(exc)})
+            records.append(item)
+        if best:
+            _, selected, selected_path = best
+            final = frames / f'frame-{index:03d}-{second:05d}s.png'
+            final.write_bytes(selected_path.read_bytes())
+            selected['selected'] = True
+    browser.close()
+
+selected_frames = sorted(frames.glob('frame-*.png'))
+unique_hashes = {hashlib.sha256(p.read_bytes()).hexdigest() for p in selected_frames}
+suspicious = []
+for record in records:
+    text = (record.get('body_text') or '').lower()
+    if any(term in text for term in ['not a bot', 'sign in', 'video unavailable', '오류', '로그인', '재생할 수']):
+        suspicious.append({'source_second': record.get('source_second'), 'body_text': record.get('body_text')})
+result = {
+    'status': 'embed_frames_captured' if selected_frames else 'failed',
+    'video_id': '7UXprjqSBvk',
+    'source_start_seconds': 1380,
+    'source_end_seconds': 1620,
+    'selected_frame_count': len(selected_frames),
+    'unique_selected_hashes': len(unique_hashes),
+    'suspicious_text_hits': suspicious,
+}
+(root / 'capture-records.json').write_text(json.dumps(records, ensure_ascii=False, indent=2), encoding='utf-8')
+(root / 'result.json').write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
