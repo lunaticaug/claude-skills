@@ -1,0 +1,10 @@
+{
+  "bytes": 26697,
+  "base64_chars": 35596,
+  "chunk_count": 2,
+  "sha256": "a730822ace8ee487088258419e0cfae52a56c4798dc7e8a6b354969b4879cd0a",
+  "parts": [
+    "part-000.txt",
+    "part-001.txt"
+  ]
+}

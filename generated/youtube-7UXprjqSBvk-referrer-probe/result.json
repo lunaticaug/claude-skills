@@ -1,0 +1,19 @@
+{
+  "status": "captured",
+  "video_id": "7UXprjqSBvk",
+  "source_second": 1380,
+  "chrome": "/usr/bin/google-chrome",
+  "png_bytes": 178021,
+  "jpg_bytes": 26697,
+  "mean_rgb": [
+    23.63,
+    17.67,
+    24.94
+  ],
+  "stddev_rgb": [
+    28.56,
+    26.32,
+    27.48
+  ],
+  "sha256": "a730822ace8ee487088258419e0cfae52a56c4798dc7e8a6b354969b4879cd0a"
+}
